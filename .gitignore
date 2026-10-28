@@ -1,0 +1,7 @@
+.gradle/
+**/build/
+.local-tools/
+.atl/
+.codegraph/
+local.properties
+
