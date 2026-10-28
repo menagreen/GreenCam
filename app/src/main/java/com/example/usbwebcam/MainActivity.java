@@ -32,12 +32,15 @@ public final class MainActivity extends AppCompatActivity {
     private ProcessCameraProvider cameraProvider;
     private int lensFacing = CameraSelectionPolicy.LENS_BACK;
     private boolean started;
+    private final PreviewStartGate previewStartGate = new PreviewStartGate();
 
     private final ActivityResultLauncher<String> cameraPermission = registerForActivityResult(
             new ActivityResultContracts.RequestPermission(), granted -> {
                 if (granted) {
+                    previewStartGate.requestStart();
                     startPreview();
                 } else {
+                    previewStartGate.cancel();
                     statusView.setText("Camera permission is required to start preview.");
                     updateControls();
                 }
@@ -94,7 +97,9 @@ public final class MainActivity extends AppCompatActivity {
                 cameraProvider = future.get();
                 chooseAvailableDefaultCamera();
                 updateControls();
+                attemptStartPreview();
             } catch (ExecutionException | InterruptedException exception) {
+                previewStartGate.cancel();
                 if (exception instanceof InterruptedException) {
                     Thread.currentThread().interrupt();
                 }
@@ -122,8 +127,18 @@ public final class MainActivity extends AppCompatActivity {
     }
 
     private void startPreview() {
+        previewStartGate.requestStart();
+        attemptStartPreview();
+    }
+
+    private void attemptStartPreview() {
         if (cameraProvider == null) {
             statusView.setText("Preparing camera…");
+            return;
+        }
+        boolean permissionGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+                == PackageManager.PERMISSION_GRANTED;
+        if (!previewStartGate.consumeIfReady(cameraProvider != null, permissionGranted)) {
             return;
         }
         if (!hasCamera(lensFacing)) {
@@ -147,6 +162,7 @@ public final class MainActivity extends AppCompatActivity {
     }
 
     private void stopPreview() {
+        previewStartGate.cancel();
         if (cameraProvider != null) {
             cameraProvider.unbindAll();
         }
