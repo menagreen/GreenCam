@@ -33,8 +33,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public final class MainActivity extends AppCompatActivity {
-    private static final long MIN_FRAME_INTERVAL_NANOS = 1_000_000_000L / 15;
-
     private PreviewView previewView;
     private TextView statusView;
     private Button startButton;
@@ -47,7 +45,7 @@ public final class MainActivity extends AppCompatActivity {
     private final ExecutorService analysisExecutor = Executors.newSingleThreadExecutor();
     private MjpegHttpServer mjpegServer;
     private long frameSessionId;
-    private long lastEncodedFrameAtNanos;
+    private final FrameRateLimiter frameRateLimiter = new FrameRateLimiter();
 
     private final ActivityResultLauncher<String> cameraPermission = registerForActivityResult(
             new ActivityResultContracts.RequestPermission(), granted -> {
@@ -191,7 +189,7 @@ public final class MainActivity extends AppCompatActivity {
                             .build())
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                     .build();
-            lastEncodedFrameAtNanos = 0;
+            frameRateLimiter.reset();
             long analyzerSession = newFrameSession;
             analysis.setAnalyzer(analysisExecutor,
                     image -> analyzeFrame(image, analyzerSession));
@@ -216,10 +214,9 @@ public final class MainActivity extends AppCompatActivity {
     private void analyzeFrame(ImageProxy image, long analyzerSession) {
         try {
             long now = System.nanoTime();
-            if (now - lastEncodedFrameAtNanos < MIN_FRAME_INTERVAL_NANOS) {
+            if (!frameRateLimiter.shouldEncode(now)) {
                 return;
             }
-            lastEncodedFrameAtNanos = now;
             byte[] jpeg = YuvJpegEncoder.encode(image);
             if (jpeg != null) {
                 jpegFrames.publish(analyzerSession, jpeg);
