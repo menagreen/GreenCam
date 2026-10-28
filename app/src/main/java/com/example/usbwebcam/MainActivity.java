@@ -3,6 +3,7 @@ package com.example.usbwebcam;
 import android.Manifest;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.util.Size;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
@@ -15,16 +16,25 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.camera.core.CameraSelector;
 import androidx.camera.core.CameraInfoUnavailableException;
+import androidx.camera.core.ImageAnalysis;
+import androidx.camera.core.ImageProxy;
 import androidx.camera.core.Preview;
+import androidx.camera.core.resolutionselector.ResolutionSelector;
+import androidx.camera.core.resolutionselector.ResolutionStrategy;
 import androidx.camera.lifecycle.ProcessCameraProvider;
 import androidx.camera.view.PreviewView;
 import androidx.core.content.ContextCompat;
 
 import com.google.common.util.concurrent.ListenableFuture;
 
+import java.io.IOException;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public final class MainActivity extends AppCompatActivity {
+    private static final long MIN_FRAME_INTERVAL_NANOS = 1_000_000_000L / 15;
+
     private PreviewView previewView;
     private TextView statusView;
     private Button startButton;
@@ -33,6 +43,11 @@ public final class MainActivity extends AppCompatActivity {
     private int lensFacing = CameraSelectionPolicy.LENS_BACK;
     private boolean started;
     private final PreviewStartGate previewStartGate = new PreviewStartGate();
+    private final LatestJpegFrameStore jpegFrames = new LatestJpegFrameStore();
+    private final ExecutorService analysisExecutor = Executors.newSingleThreadExecutor();
+    private MjpegHttpServer mjpegServer;
+    private long frameSessionId;
+    private long lastEncodedFrameAtNanos;
 
     private final ActivityResultLauncher<String> cameraPermission = registerForActivityResult(
             new ActivityResultContracts.RequestPermission(), granted -> {
@@ -58,6 +73,12 @@ public final class MainActivity extends AppCompatActivity {
     protected void onStop() {
         stopPreview();
         super.onStop();
+    }
+
+    @Override
+    protected void onDestroy() {
+        analysisExecutor.shutdownNow();
+        super.onDestroy();
     }
 
     private void createLayout() {
@@ -146,27 +167,82 @@ public final class MainActivity extends AppCompatActivity {
             return;
         }
 
+        long newFrameSession = jpegFrames.beginSession();
+        MjpegHttpServer server = mjpegServer;
+        if (server == null || !server.isRunning()) {
+            server = new MjpegHttpServer(jpegFrames);
+            try {
+                server.start();
+            } catch (IOException exception) {
+                jpegFrames.endSession(newFrameSession);
+                statusView.setText("Unable to start the local USB stream.");
+                updateControls();
+                return;
+            }
+        }
+
         try {
             Preview preview = new Preview.Builder().build();
             preview.setSurfaceProvider(previewView.getSurfaceProvider());
+            ImageAnalysis analysis = new ImageAnalysis.Builder()
+                    .setResolutionSelector(new ResolutionSelector.Builder()
+                            .setResolutionStrategy(new ResolutionStrategy(new Size(1280, 720),
+                                    ResolutionStrategy.FALLBACK_RULE_CLOSEST_LOWER_THEN_HIGHER))
+                            .build())
+                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                    .build();
+            lastEncodedFrameAtNanos = 0;
+            long analyzerSession = newFrameSession;
+            analysis.setAnalyzer(analysisExecutor,
+                    image -> analyzeFrame(image, analyzerSession));
             cameraProvider.unbindAll();
-            cameraProvider.bindToLifecycle(this, selectorFor(lensFacing), preview);
+            cameraProvider.bindToLifecycle(this, selectorFor(lensFacing), preview, analysis);
+            frameSessionId = newFrameSession;
+            mjpegServer = server;
             started = true;
-            statusView.setText("Camera preview is running.");
+            statusView.setText("Camera preview and USB stream are running.");
             updateControls();
         } catch (IllegalArgumentException | IllegalStateException exception) {
             started = false;
+            jpegFrames.endSession(newFrameSession);
+            server.close();
+            mjpegServer = null;
+            frameSessionId = 0;
             statusView.setText("Unable to start camera preview.");
             updateControls();
         }
     }
 
+    private void analyzeFrame(ImageProxy image, long analyzerSession) {
+        try {
+            long now = System.nanoTime();
+            if (now - lastEncodedFrameAtNanos < MIN_FRAME_INTERVAL_NANOS) {
+                return;
+            }
+            lastEncodedFrameAtNanos = now;
+            byte[] jpeg = YuvJpegEncoder.encode(image);
+            if (jpeg != null) {
+                jpegFrames.publish(analyzerSession, jpeg);
+            }
+        } catch (RuntimeException ignored) {
+            // Drop malformed or unsupported camera frames without stopping preview.
+        } finally {
+            image.close();
+        }
+    }
+
     private void stopPreview() {
         previewStartGate.cancel();
+        started = false;
+        jpegFrames.endSession(frameSessionId);
+        frameSessionId = 0;
+        if (mjpegServer != null) {
+            mjpegServer.close();
+            mjpegServer = null;
+        }
         if (cameraProvider != null) {
             cameraProvider.unbindAll();
         }
-        started = false;
         if (statusView != null) {
             statusView.setText("Camera preview stopped.");
             updateControls();
