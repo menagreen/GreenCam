@@ -26,4 +26,4 @@ The app already toggles front/back cameras, but does not show the active camera.
 
 ## Progress
 - Exploration: `MainActivity` already toggles front/back via `CameraSelectionPolicy`; the UI has no active-lens indicator. `MIN_FRAME_INTERVAL_NANOS` enforces a fixed 15 FPS output cap in `analyzeFrame`.
-- Current branch: `codex/camera-controls-ui`. T1 work-unit commit: `5fba010b4f5aa38e4ac553c12d331d4617c68aef`. T2 implementation is complete; next: verify UI and stream on device, then deliver. README points to the planned `v0.1.0-alpha.2` prerelease; release metadata must match before publishing.
+- Current branch: `codex/camera-controls-ui`. T1 work-unit commit: `5fba010b4f5aa38e4ac553c12d331d4617c68aef`. T2 work-unit commit: `bdb7498069984ca165407e861f9d57c34d19893e`. T2 implementation is complete; next: verify UI and stream on device, then deliver. README points to the planned `v0.1.0-alpha.2` prerelease; release metadata must match before publishing.
