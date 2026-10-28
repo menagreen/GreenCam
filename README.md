@@ -12,7 +12,7 @@ GreenCam turns an Android phone into a video-only webcam for OBS Studio over a U
 
 ### 1. Install and start GreenCam
 
-Download the [v0.1.0-alpha.1 preview APK](https://github.com/menagreen/GreenCam/releases/download/v0.1.0-alpha.1/GreenCam-v0.1.0-alpha.1-debug.apk) or build the debug APK from source below, then install it on the phone. This preview is debug-signed, not a production-signed release; a future build with a different signing key may require uninstalling it first. Open **GreenCam**, tap **Start camera**, and grant camera permission when Android asks. Use **Switch camera** to change lenses when both front and rear cameras are available. Keep GreenCam in the foreground; leaving the app stops the camera and stream.
+Download the [v0.1.0-alpha.2 preview APK](https://github.com/menagreen/GreenCam/releases/download/v0.1.0-alpha.2/GreenCam-v0.1.0-alpha.2-debug.apk) or build the debug APK from source below, then install it on the phone. This preview is debug-signed, not a production-signed release; a future build with a different signing key may require uninstalling it first. Open **GreenCam**, choose the available **Rear camera** or **Front camera**, select an output limit of **10**, **15**, or **30 FPS**, then tap **Start camera** and grant camera permission when Android asks. Keep GreenCam in the foreground; leaving the app stops the camera and stream.
 
 ### 2. Forward the stream over USB
 
@@ -43,7 +43,8 @@ See the [OBS Browser Source guide](https://obsproject.com/kb/browser-source) for
 ## Controls and privacy
 
 - **Start camera / Stop camera** controls preview and streaming together.
-- **Switch camera** is enabled only when another lens is available.
+- **Rear camera / Front camera** shows the active choice; unavailable cameras cannot be selected. You can change cameras while running.
+- **Output rate (up to)** limits the MJPEG output to 10, 15, or 30 FPS. The default is 15 FPS. You can change the cap while running; the actual rate may be lower depending on camera hardware and device load.
 - The app requests camera permission at runtime; the `INTERNET` permission is a normal install-time permission used for the local socket. It captures video only.
 - The HTTP server listens on phone loopback only, not on Wi-Fi or cellular interfaces. ADB forwarding provides the USB bridge to the host.
 - Streaming ends when you stop the camera or leave GreenCam. No background service or cloud upload is used.
