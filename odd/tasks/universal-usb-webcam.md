@@ -18,7 +18,7 @@ The user wants to repurpose a Huawei P30 Pro as a webcam and reuse the APK on ot
 - USB access via `adb forward tcp:8765 tcp:8765`; OBS Browser Source loads a local page. No Wi-Fi exposure.
 - Initial target: 720p at up to 15 fps, front/back camera choice where available. Video only.
 - Strict TDD: enabled by project instructions. Test runner: `gradlew.bat testDebugUnitTest` once the Android project exists. Observe RED before implementation, then GREEN and REFACTOR.
-- Delivery strategy: ask-on-risk. Forecast: approximately 380 authored changed lines for this minimal first version, excluding generated wrappers and local tools. Track actual lines after each work-unit commit; if the branch grows beyond about 400 lines, resolve chain strategy before the next commit.
+- Delivery strategy: ask-on-risk; user chose `stacked-to-main` (sequential PRs to `main`) on 2026-10-28. Initial 380-line forecast was low: T1 and its correction total 436 authored changed lines across work-unit commits, excluding generated wrappers and local tools. Remote `origin` is `menagreen/GreenCam`; keep each PR diff reviewable and record slice boundaries below.
 - Engram mirror topic: `odd/universal-usb-webcam/tasks`; pending because no authoritative runtime session identity is currently registered. Do not claim mirror success.
 
 ## Tasks
@@ -37,4 +37,5 @@ The user wants to repurpose a Huawei P30 Pro as a webcam and reuse the APK on ot
 - T1 implementation adds a permission-gated foreground CameraX preview with explicit start/stop, front/back switching when another lens is available, and a safe fallback to the front camera when no rear camera exists. The provider/permission startup race is guarded by a testable pending-start gate; stop, denial, and provider failure cancel a pending start. Java was selected to avoid introducing a Kotlin plugin. Local JDK 17, Gradle 8.9, Android SDK platform/build-tools and command-line tools live under ignored `.local-tools/`.
 - Exploration complete; CameraX plus loopback MJPEG/OBS selected as simplest portable architecture.
 - Branch: `codex/universal-usb-webcam`; initial T1 work and task record are committed.
+- Delivery slices: PR 1 will carry T1 after integrating the remote baseline. PR 2 will carry the transport and final setup once verified. Do not release an untested APK.
 - Next: implement T2 loopback MJPEG transport; T3 remains pending.
