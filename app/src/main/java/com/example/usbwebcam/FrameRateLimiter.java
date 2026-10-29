@@ -9,7 +9,7 @@ final class FrameRateLimiter {
     }
 
     synchronized void setMaxFps(int fps) {
-        if (fps != 10 && fps != 15 && fps != 30) {
+        if (fps != 10 && fps != 15 && fps != 30 && fps != 60) {
             throw new IllegalArgumentException("Unsupported FPS cap: " + fps);
         }
         maxFps = fps;

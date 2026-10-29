@@ -49,6 +49,7 @@ public final class MainActivity extends AppCompatActivity {
     private RadioButton fps10Button;
     private RadioButton fps15Button;
     private RadioButton fps30Button;
+    private RadioButton fps60Button;
     private boolean syncingControls;
     private ProcessCameraProvider cameraProvider;
     private int lensFacing = CameraSelectionPolicy.LENS_BACK;
@@ -160,12 +161,14 @@ public final class MainActivity extends AppCompatActivity {
         fps10Button = fpsOption(10);
         fps15Button = fpsOption(15);
         fps30Button = fpsOption(30);
+        fps60Button = fpsOption(60);
         fpsGroup.setOnCheckedChangeListener((group, checkedId) -> {
             if (syncingControls) {
                 return;
             }
             int fps = checkedId == fps10Button.getId() ? 10
-                    : checkedId == fps30Button.getId() ? 30 : 15;
+                    : checkedId == fps30Button.getId() ? 30
+                    : checkedId == fps60Button.getId() ? 60 : 15;
             frameRateLimiter.setMaxFps(fps);
             updateControls();
         });
@@ -385,7 +388,8 @@ public final class MainActivity extends AppCompatActivity {
                 ? frontButton.getId() : backButton.getId());
         int maxFps = frameRateLimiter.getMaxFps();
         fpsGroup.check(maxFps == 10 ? fps10Button.getId()
-                : maxFps == 30 ? fps30Button.getId() : fps15Button.getId());
+                : maxFps == 30 ? fps30Button.getId()
+                : maxFps == 60 ? fps60Button.getId() : fps15Button.getId());
         syncingControls = false;
         selectionView.setText((lensFacing == CameraSelectionPolicy.LENS_FRONT
                 ? "Front camera" : "Rear camera") + " · Up to " + maxFps + " FPS");
