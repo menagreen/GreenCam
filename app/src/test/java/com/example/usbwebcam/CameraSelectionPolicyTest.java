@@ -18,4 +18,22 @@ public class CameraSelectionPolicyTest {
         assertEquals(CameraSelectionPolicy.LENS_BACK,
                 CameraSelectionPolicy.switchLens(-1));
     }
+
+    @Test
+    public void explicitSelectionKeepsCurrentLensWhenRequestedCameraIsUnavailable() {
+        assertEquals(CameraSelectionPolicy.LENS_BACK,
+                CameraSelectionPolicy.selectLens(CameraSelectionPolicy.LENS_BACK,
+                        CameraSelectionPolicy.LENS_FRONT, false));
+        assertEquals(CameraSelectionPolicy.LENS_FRONT,
+                CameraSelectionPolicy.selectLens(CameraSelectionPolicy.LENS_BACK,
+                        CameraSelectionPolicy.LENS_FRONT, true));
+    }
+
+    @Test
+    public void defaultSelectionFallsBackToAvailableFrontCamera() {
+        assertEquals(CameraSelectionPolicy.LENS_FRONT,
+                CameraSelectionPolicy.defaultLens(false, true));
+        assertEquals(CameraSelectionPolicy.LENS_BACK,
+                CameraSelectionPolicy.defaultLens(true, true));
+    }
 }
