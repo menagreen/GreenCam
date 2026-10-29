@@ -44,7 +44,7 @@ See the [OBS Browser Source guide](https://obsproject.com/kb/browser-source) for
 
 - **Start camera / Stop camera** controls preview and streaming together.
 - **Rear camera / Front camera** shows the active choice; unavailable cameras cannot be selected. You can change cameras while running.
-- **Output rate (up to)** limits the MJPEG output to 10, 15, 30, or 60 FPS. The default is 15 FPS. You can change the cap while running; the actual rate may be lower depending on camera hardware and device load. The 60 FPS setting limits output pacing only; it does not request a 60 FPS camera capture mode, and actual throughput has not been measured on every device.
+- **Output rate (up to)** limits the MJPEG output to 10, 15, 30, or 60 FPS. The default is 15 FPS. You can change the cap while running; the actual rate may be lower depending on camera hardware and device load. The 60 FPS setting limits output pacing only; it does not request a 60 FPS camera capture mode. On a Huawei VOG-L04, 60 FPS output caps measured about 25 FPS from either camera; its advertised Camera2 AE target ranges maxed out at 30 FPS.
 - The app requests camera permission at runtime; the `INTERNET` permission is a normal install-time permission used for the local socket. It captures video only.
 - The HTTP server listens on phone loopback only, not on Wi-Fi or cellular interfaces. ADB forwarding provides the USB bridge to the host.
 - Streaming ends when you stop the camera or leave GreenCam. No background service or cloud upload is used.
