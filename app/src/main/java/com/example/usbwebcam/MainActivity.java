@@ -2,6 +2,7 @@ package com.example.usbwebcam;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
+import android.hardware.camera2.CameraCharacteristics;
 import android.os.Bundle;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -18,14 +19,19 @@ import android.widget.TextView;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
+import androidx.annotation.OptIn;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.camera.core.CameraSelector;
+import androidx.camera.core.CameraInfo;
 import androidx.camera.core.CameraInfoUnavailableException;
+import androidx.camera.core.CameraSelector;
+import androidx.camera.core.Camera;
 import androidx.camera.core.ImageAnalysis;
 import androidx.camera.core.ImageProxy;
 import androidx.camera.core.Preview;
 import androidx.camera.core.resolutionselector.ResolutionSelector;
 import androidx.camera.core.resolutionselector.ResolutionStrategy;
+import androidx.camera.camera2.interop.Camera2CameraInfo;
+import androidx.camera.camera2.interop.ExperimentalCamera2Interop;
 import androidx.camera.lifecycle.ProcessCameraProvider;
 import androidx.camera.view.PreviewView;
 import androidx.core.content.ContextCompat;
@@ -41,6 +47,7 @@ public final class MainActivity extends AppCompatActivity {
     private PreviewView previewView;
     private TextView statusView;
     private TextView selectionView;
+    private TextView cameraCapabilityView;
     private Button startButton;
     private RadioGroup cameraGroup;
     private RadioGroup fpsGroup;
@@ -52,6 +59,7 @@ public final class MainActivity extends AppCompatActivity {
     private RadioButton fps60Button;
     private boolean syncingControls;
     private ProcessCameraProvider cameraProvider;
+    private CameraInfo boundCameraInfo;
     private int lensFacing = CameraSelectionPolicy.LENS_BACK;
     private boolean started;
     private final PreviewStartGate previewStartGate = new PreviewStartGate();
@@ -129,6 +137,10 @@ public final class MainActivity extends AppCompatActivity {
         selectionView = new TextView(this);
         selectionView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         root.addView(selectionView);
+
+        cameraCapabilityView = new TextView(this);
+        cameraCapabilityView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        root.addView(cameraCapabilityView);
 
         TextView cameraLabel = new TextView(this);
         cameraLabel.setText("Camera");
@@ -293,7 +305,9 @@ public final class MainActivity extends AppCompatActivity {
             analysis.setAnalyzer(analysisExecutor,
                     image -> analyzeFrame(image, analyzerSession));
             cameraProvider.unbindAll();
-            cameraProvider.bindToLifecycle(this, selectorFor(lensFacing), preview, analysis);
+            Camera boundCamera = cameraProvider.bindToLifecycle(
+                    this, selectorFor(lensFacing), preview, analysis);
+            boundCameraInfo = boundCamera.getCameraInfo();
             frameSessionId = newFrameSession;
             mjpegServer = server;
             started = true;
@@ -339,6 +353,7 @@ public final class MainActivity extends AppCompatActivity {
         if (cameraProvider != null) {
             cameraProvider.unbindAll();
         }
+        boundCameraInfo = null;
         if (statusView != null) {
             statusView.setText("Camera preview stopped.");
             updateControls();
@@ -373,6 +388,7 @@ public final class MainActivity extends AppCompatActivity {
         return new CameraSelector.Builder().requireLensFacing(facing).build();
     }
 
+    @OptIn(markerClass = ExperimentalCamera2Interop.class)
     private void updateControls() {
         if (startButton == null) {
             return;
@@ -386,17 +402,54 @@ public final class MainActivity extends AppCompatActivity {
         frontButton.setEnabled(frontAvailable);
         cameraGroup.check(lensFacing == CameraSelectionPolicy.LENS_FRONT
                 ? frontButton.getId() : backButton.getId());
-        int maxFps = frameRateLimiter.getMaxFps();
+        int advertisedMaximum = selectedCameraAdvertisedMaximum();
+        int selectedFps = FpsCapabilityPolicy.reconcileSelection(
+                frameRateLimiter.getMaxFps(), advertisedMaximum);
+        frameRateLimiter.setMaxFps(selectedFps);
+        fps10Button.setEnabled(FpsCapabilityPolicy.isOptionEnabled(10, advertisedMaximum));
+        fps15Button.setEnabled(FpsCapabilityPolicy.isOptionEnabled(15, advertisedMaximum));
+        fps30Button.setEnabled(FpsCapabilityPolicy.isOptionEnabled(30, advertisedMaximum));
+        fps60Button.setEnabled(FpsCapabilityPolicy.isOptionEnabled(60, advertisedMaximum));
+        int maxFps = selectedFps;
         fpsGroup.check(maxFps == 10 ? fps10Button.getId()
                 : maxFps == 30 ? fps30Button.getId()
                 : maxFps == 60 ? fps60Button.getId() : fps15Button.getId());
         syncingControls = false;
         selectionView.setText((lensFacing == CameraSelectionPolicy.LENS_FRONT
                 ? "Front camera" : "Rear camera") + " · Up to " + maxFps + " FPS");
+        cameraCapabilityView.setText(advertisedMaximum == FpsCapabilityPolicy.UNKNOWN_MAX_FPS
+                ? "Camera capture maximum: Unknown. Output FPS is a limit, not measured throughput."
+                : "Camera advertises up to " + advertisedMaximum
+                        + " FPS; actual output may be lower.");
         if (cameraProvider == null) {
             statusView.setText("Preparing camera…");
         } else if (!backAvailable && !frontAvailable) {
             statusView.setText("No camera is available on this device.");
+        }
+    }
+
+    @OptIn(markerClass = ExperimentalCamera2Interop.class)
+    private int selectedCameraAdvertisedMaximum() {
+        if (cameraProvider == null) {
+            return FpsCapabilityPolicy.UNKNOWN_MAX_FPS;
+        }
+        try {
+            CameraInfo selectedInfo = started && boundCameraInfo != null
+                    ? boundCameraInfo
+                    : selectorFor(lensFacing).filter(cameraProvider.getAvailableCameraInfos()).get(0);
+            android.util.Range<Integer>[] ranges = Camera2CameraInfo.from(selectedInfo)
+                    .getCameraCharacteristic(
+                            CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES);
+            if (ranges == null || ranges.length == 0) {
+                return FpsCapabilityPolicy.UNKNOWN_MAX_FPS;
+            }
+            int[] upperBounds = new int[ranges.length];
+            for (int index = 0; index < ranges.length; index++) {
+                upperBounds[index] = ranges[index].getUpper();
+            }
+            return FpsCapabilityPolicy.advertisedMaximum(upperBounds);
+        } catch (IllegalArgumentException | IndexOutOfBoundsException | NullPointerException exception) {
+            return FpsCapabilityPolicy.UNKNOWN_MAX_FPS;
         }
     }
 }
