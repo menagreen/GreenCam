@@ -28,7 +28,7 @@ Create a minimal vector launcher icon with a G and C separated by a diagonal cut
 - Tests/build/lint and feasible device checks have observed, honestly reported outcomes.
 
 ## Progress
-- Exploration confirmed CameraX `CameraInfo` and Camera2's `CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES` can identify a per-camera advertised range with the current library. T2 icon work remains untouched.
+- Exploration confirmed CameraX `CameraInfo` and Camera2's `CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES` can identify a per-camera advertised range with the current library. T2 launcher icon implementation and verification are complete (commit `fec4ad6`).
 - T1 verification: first `gradlew.bat testDebugUnitTest` failed at test compilation because `FpsCapabilityPolicy` did not yet exist (expected RED). After implementation, `gradlew.bat testDebugUnitTest` passed. Full `gradlew.bat testDebugUnitTest assembleDebug lintDebug --offline --console=plain` passed using the local JDK 17 and Android SDK; lint reported 19 warnings and no errors. `git diff --check` passed. Independent Huawei smoke confirmed the per-camera 30 FPS labels and disabled 60 option on both lenses; front/rear changes, stop/restart, and loopback MJPEG passed. OBS was not rerun.
 - Future backlog: optional frame interpolation to a 60 FPS output, with an explicit latency/quality/performance evaluation; not authorized as current implementation.
-- Branch: `codex/camera-fps-icon`. Next: T2 icon implementation.
+- Branch: `codex/camera-fps-icon`. Next: finish T3 delivery after merge/release; release-prep metadata and documentation are verified for alpha.3; T3 remains incomplete pending merge and publication. Release-prep work-unit commit: `62f21eb`.
