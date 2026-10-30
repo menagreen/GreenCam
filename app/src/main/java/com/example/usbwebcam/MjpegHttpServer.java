@@ -107,7 +107,8 @@ final class MjpegHttpServer implements AutoCloseable {
             MjpegHttpProtocol.Route route = request.route;
             OutputStream output = client.getOutputStream();
             if (route == MjpegHttpProtocol.Route.INDEX) {
-                output.write(MjpegHttpProtocol.indexResponse());
+                output.write(authenticator == null ? MjpegHttpProtocol.indexResponse()
+                        : MjpegHttpProtocol.indexResponse(authenticator.tokenForSession()));
                 output.flush();
             } else if (route == MjpegHttpProtocol.Route.STREAM) {
                 if (!activeStream.compareAndSet(null, client)) {

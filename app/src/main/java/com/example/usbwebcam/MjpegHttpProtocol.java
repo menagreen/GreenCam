@@ -43,6 +43,18 @@ final class MjpegHttpProtocol {
         return response(200, "OK", "text/html; charset=utf-8", INDEX_PAGE);
     }
 
+    static byte[] indexResponse(String token) {
+        return response(200, "OK", "text/html; charset=utf-8",
+                indexPage(token).getBytes(StandardCharsets.UTF_8));
+    }
+
+    static String indexPage(String token) {
+        if (token == null || !token.matches("[0-9a-f]{32}")) {
+            throw new IllegalArgumentException("Token must contain 128 bits encoded as lowercase hex");
+        }
+        return indexPage().replace("src=\"/stream.mjpg\"", "src=\"/stream.mjpg?token=" + token + "\"");
+    }
+
     static byte[] streamHeaders() {
         return ("HTTP/1.1 200 OK\r\n"
                 + "Content-Type: multipart/x-mixed-replace; boundary=" + BOUNDARY + "\r\n"
