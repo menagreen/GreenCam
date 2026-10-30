@@ -1,7 +1,13 @@
 package com.example.usbwebcam;
 
 import android.Manifest;
+import android.content.Context;
 import android.content.pm.PackageManager;
+import android.net.ConnectivityManager;
+import android.net.LinkAddress;
+import android.net.LinkProperties;
+import android.net.Network;
+import android.net.NetworkRequest;
 import android.hardware.camera2.CameraCharacteristics;
 import android.os.Bundle;
 import android.graphics.Color;
@@ -42,6 +48,10 @@ import androidx.core.content.ContextCompat;
 import com.google.common.util.concurrent.ListenableFuture;
 
 import java.io.IOException;
+import java.net.Inet4Address;
+import java.net.InetAddress;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -53,6 +63,9 @@ public final class MainActivity extends AppCompatActivity {
     private TextView cameraCapabilityView;
     private Button startButton;
     private Button dimScreenButton;
+    private Button wifiButton;
+    private TextView wifiWarningView;
+    private TextView wifiUrlView;
     private FrameLayout dimOverlay;
     private RadioGroup cameraGroup;
     private RadioGroup fpsGroup;
@@ -73,6 +86,13 @@ public final class MainActivity extends AppCompatActivity {
     private final LatestJpegFrameStore jpegFrames = new LatestJpegFrameStore();
     private final ExecutorService analysisExecutor = Executors.newSingleThreadExecutor();
     private MjpegHttpServer mjpegServer;
+    private MjpegHttpServer wifiServer;
+    private ConnectivityManager connectivityManager;
+    private ConnectivityManager.NetworkCallback wifiNetworkCallback;
+    private Network wifiNetwork;
+    private String wifiAddress;
+    private MjpegRequestAuthenticator wifiAuthenticator;
+    private boolean wifiEnabled;
     private long frameSessionId;
     private final FrameRateLimiter frameRateLimiter = new FrameRateLimiter();
 
@@ -105,6 +125,7 @@ public final class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         exitDimScreenMode();
+        stopWifiListener(true);
         analysisExecutor.shutdownNow();
         super.onDestroy();
     }
@@ -209,6 +230,25 @@ public final class MainActivity extends AppCompatActivity {
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         dimParams.topMargin = dp(8);
         root.addView(dimScreenButton, dimParams);
+
+        wifiButton = new Button(this);
+        wifiButton.setText("Enable Wi-Fi OBS stream");
+        wifiButton.setEnabled(false);
+        wifiButton.setOnClickListener(view -> setWifiEnabled(!wifiEnabled));
+        LinearLayout.LayoutParams wifiParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        wifiParams.topMargin = dp(8);
+        root.addView(wifiButton, wifiParams);
+        wifiWarningView = new TextView(this);
+        wifiWarningView.setText("Wi-Fi streaming is for a trusted local network only. The URL contains a bearer token; HTTP is not encrypted and the token is not confidentiality protection.");
+        wifiWarningView.setVisibility(View.GONE);
+        wifiWarningView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        root.addView(wifiWarningView);
+        wifiUrlView = new TextView(this);
+        wifiUrlView.setTextIsSelectable(true);
+        wifiUrlView.setVisibility(View.GONE);
+        wifiUrlView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
+        root.addView(wifiUrlView);
 
         TextView help = new TextView(this);
         help.setText("Keep GreenCam open. On your computer, forward ADB port 8765 and add http://localhost:8765/ as an OBS Browser Source.");
@@ -349,6 +389,9 @@ public final class MainActivity extends AppCompatActivity {
             mjpegServer = server;
             started = true;
             statusView.setText("Camera preview and USB stream are running.");
+            if (wifiEnabled) {
+                registerWifiNetworkCallback();
+            }
             updateControls();
         } catch (IllegalArgumentException | IllegalStateException exception) {
             started = false;
@@ -380,6 +423,7 @@ public final class MainActivity extends AppCompatActivity {
 
     private void stopPreview() {
         exitDimScreenMode();
+        stopWifiListener(true);
         previewStartGate.cancel();
         started = false;
         jpegFrames.endSession(frameSessionId);
@@ -410,6 +454,169 @@ public final class MainActivity extends AppCompatActivity {
         updateControls();
     }
 
+    private void setWifiEnabled(boolean enabled) {
+        if (!started) {
+            return;
+        }
+        wifiEnabled = enabled;
+        if (enabled) {
+            registerWifiNetworkCallback();
+        } else {
+            stopWifiListener(false);
+        }
+        updateControls();
+    }
+
+    private void registerWifiNetworkCallback() {
+        if (!started || !wifiEnabled || wifiNetworkCallback != null) {
+            return;
+        }
+        connectivityManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        if (connectivityManager == null) {
+            return;
+        }
+        NetworkRequest request = new NetworkRequest.Builder()
+                .addTransportType(android.net.NetworkCapabilities.TRANSPORT_WIFI)
+                .build();
+        wifiNetworkCallback = new ConnectivityManager.NetworkCallback() {
+            @Override
+            public void onAvailable(Network network) {
+                runOnUiThread(() -> {
+                    if (wifiNetworkCallback == this) {
+                        wifiNetwork = network;
+                        LinkProperties properties = connectivityManager.getLinkProperties(network);
+                        updateWifiAddress(properties);
+                    }
+                });
+            }
+
+            @Override
+            public void onLinkPropertiesChanged(Network network, LinkProperties properties) {
+                runOnUiThread(() -> {
+                    if (wifiNetworkCallback == this && network.equals(wifiNetwork)) {
+                        updateWifiAddress(properties);
+                    }
+                });
+            }
+
+            @Override
+            public void onLost(Network network) {
+                runOnUiThread(() -> {
+                    if (wifiNetworkCallback == this && network.equals(wifiNetwork)) {
+                        wifiNetwork = null;
+                        updateWifiAddress(null);
+                    }
+                });
+            }
+        };
+        try {
+            connectivityManager.registerNetworkCallback(request, wifiNetworkCallback);
+        } catch (RuntimeException exception) {
+            wifiNetworkCallback = null;
+            wifiNetwork = null;
+            updateWifiAddress(null);
+        }
+    }
+
+    private void updateWifiAddress(LinkProperties properties) {
+        List<String> candidates = new ArrayList<>();
+        if (properties != null) {
+            for (LinkAddress linkAddress : properties.getLinkAddresses()) {
+                InetAddress address = linkAddress.getAddress();
+                if (address instanceof Inet4Address) {
+                    candidates.add(address.getHostAddress());
+                }
+            }
+        }
+        String selectedAddress = WifiNetworkPolicy.desiredListenerAddress(
+                started, wifiEnabled, candidates);
+        if (selectedAddress == null) {
+            wifiAddress = null;
+            closeWifiServer();
+            hideWifiUrl();
+            return;
+        }
+        if (!selectedAddress.equals(wifiAddress) || wifiServer == null || !wifiServer.isRunning()) {
+            wifiAddress = selectedAddress;
+            startWifiServer(selectedAddress);
+        }
+        refreshWifiUrl();
+    }
+
+    private void startWifiServer(String address) {
+        closeWifiServer();
+        if (!WifiNetworkPolicy.shouldListen(started, wifiEnabled, address)) {
+            hideWifiUrl();
+            return;
+        }
+        if (wifiAuthenticator == null) {
+            wifiAuthenticator = MjpegRequestAuthenticator.create();
+        }
+        try {
+            InetAddress bindAddress = InetAddress.getByName(address);
+            MjpegHttpServer server = new MjpegHttpServer(jpegFrames, MjpegHttpServer.PORT,
+                    wifiAuthenticator, bindAddress);
+            server.start();
+            wifiServer = server;
+        } catch (IOException | SecurityException exception) {
+            wifiAddress = null;
+            wifiServer = null;
+            hideWifiUrl();
+        }
+    }
+
+    private void refreshWifiUrl() {
+        if (!WifiNetworkPolicy.shouldListen(started, wifiEnabled, wifiAddress)
+                || wifiServer == null || !wifiServer.isRunning() || wifiAuthenticator == null) {
+            hideWifiUrl();
+            return;
+        }
+        String url = WifiNetworkPolicy.obsUrl(wifiAddress, wifiServer.getLocalPort(),
+                wifiAuthenticator.tokenForSession());
+        if (url == null) {
+            hideWifiUrl();
+            return;
+        }
+        wifiUrlView.setText("OBS URL (tap and hold to copy):\n" + url);
+        wifiUrlView.setVisibility(View.VISIBLE);
+    }
+
+    private void hideWifiUrl() {
+        if (wifiUrlView != null) {
+            wifiUrlView.setText("");
+            wifiUrlView.setVisibility(View.GONE);
+        }
+    }
+
+    private void closeWifiServer() {
+        if (wifiServer != null) {
+            wifiServer.close();
+            wifiServer = null;
+        }
+    }
+
+    private void stopWifiListener(boolean clearOptIn) {
+        closeWifiServer();
+        if (connectivityManager != null && wifiNetworkCallback != null) {
+            try {
+                connectivityManager.unregisterNetworkCallback(wifiNetworkCallback);
+            } catch (IllegalArgumentException ignored) {
+                // The callback may already have been unregistered by the system.
+            }
+        }
+        wifiNetworkCallback = null;
+        wifiNetwork = null;
+        wifiAddress = null;
+        wifiAuthenticator = null;
+        if (clearOptIn) {
+            wifiEnabled = false;
+        }
+        hideWifiUrl();
+        if (wifiWarningView != null) {
+            wifiWarningView.setVisibility(wifiEnabled ? View.VISIBLE : View.GONE);
+        }
+    }
+
     private boolean hasCamera(int facing) {
         if (cameraProvider == null) {
             return false;
@@ -436,6 +643,9 @@ public final class MainActivity extends AppCompatActivity {
         boolean frontAvailable = hasCamera(CameraSelectionPolicy.LENS_FRONT);
         startButton.setEnabled(backAvailable || frontAvailable);
         dimScreenButton.setEnabled(started && !dimScreenActive);
+        wifiButton.setEnabled(started);
+        wifiButton.setText(wifiEnabled ? "Disable Wi-Fi OBS stream" : "Enable Wi-Fi OBS stream");
+        wifiWarningView.setVisibility(wifiEnabled ? View.VISIBLE : View.GONE);
         syncingControls = true;
         backButton.setEnabled(backAvailable);
         frontButton.setEnabled(frontAvailable);

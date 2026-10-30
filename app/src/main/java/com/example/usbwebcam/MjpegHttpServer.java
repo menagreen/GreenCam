@@ -24,6 +24,7 @@ final class MjpegHttpServer implements AutoCloseable {
     private final LatestJpegFrameStore frames;
     private final int port;
     private final MjpegRequestAuthenticator authenticator;
+    private final InetAddress bindAddress;
     private final AtomicBoolean running = new AtomicBoolean();
     private final AtomicReference<Socket> activeStream = new AtomicReference<>();
     private final ExecutorService streamExecutor = Executors.newSingleThreadExecutor(runnable -> {
@@ -43,6 +44,11 @@ final class MjpegHttpServer implements AutoCloseable {
     }
 
     MjpegHttpServer(LatestJpegFrameStore frames, int port, MjpegRequestAuthenticator authenticator) {
+        this(frames, port, authenticator, null);
+    }
+
+    MjpegHttpServer(LatestJpegFrameStore frames, int port, MjpegRequestAuthenticator authenticator,
+            InetAddress bindAddress) {
         if (frames == null) {
             throw new IllegalArgumentException("Frame store is required");
         }
@@ -52,6 +58,7 @@ final class MjpegHttpServer implements AutoCloseable {
         this.frames = frames;
         this.port = port;
         this.authenticator = authenticator;
+        this.bindAddress = bindAddress;
     }
 
     synchronized void start() throws IOException {
@@ -61,7 +68,9 @@ final class MjpegHttpServer implements AutoCloseable {
         ServerSocket socket = new ServerSocket();
         try {
             socket.setReuseAddress(true);
-            socket.bind(new InetSocketAddress(InetAddress.getByName("127.0.0.1"), port), 4);
+            InetAddress address = bindAddress == null
+                    ? InetAddress.getByName("127.0.0.1") : bindAddress;
+            socket.bind(new InetSocketAddress(address, port), 4);
         } catch (IOException exception) {
             closeQuietly(socket);
             throw exception;
