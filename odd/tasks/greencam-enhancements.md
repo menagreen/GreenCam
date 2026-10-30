@@ -39,7 +39,7 @@ The user requested multiple camera and usability improvements. The first selecte
 - [ ] T9 — Multilingual support. Pending user backlog; not scoped or implemented.
 
 ## Progress and next step
-T1 implementation complete. Verification: `gradlew.bat testDebugUnitTest assembleDebug lintDebug --offline --console=plain` succeeded; `git diff --check` succeeded. Runtime/device harness: N/A — no authorized device interaction was requested, and this work only changes activity UI/window policy. Rollback boundary: revert the single T1 commit to remove the dim UI, brightness handling, policy tests, and documentation together. Commit identity: `ecb69c7` (`feat(camera): add reversible dim screen mode`). Engram mirror pending (no authoritative session identity available and parent requested no Engram writes).
+T1 implementation complete. Verification: `gradlew.bat testDebugUnitTest assembleDebug lintDebug --offline --console=plain` succeeded; `git diff --check` succeeded. Runtime/device harness: Huawei VOG-L04 smoke passed. The overlay covered 99.82% of the app area with pixels below RGB 20; Android window brightness reported `sbrt=0.0`; a valid JPEG streamed while dimmed. Tap restored controls/default brightness, and Stop closed the stream. Device luminance was not measured. Rollback boundary: revert the single T1 commit to remove the dim UI, brightness handling, policy tests, and documentation together. Commit identity: `e2d6221` (`feat(camera): add reversible dim screen mode`). Engram mirror pending (no authoritative session identity available and parent requested no Engram writes).
 
 ## Relevant files
 - `app/src/main/java/com/example/usbwebcam/MainActivity.java` — Android camera UI and lifecycle.
