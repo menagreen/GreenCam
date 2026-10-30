@@ -1,6 +1,6 @@
 # GreenCam
 
-GreenCam turns an Android phone into a video-only webcam for OBS Studio over a USB cable. The Android app serves a live MJPEG stream on device loopback; ADB forwards that stream to an OBS Browser Source on Windows. It does not use DroidCam, vendor-specific APIs, Wi-Fi streaming, audio capture, or background camera service.
+GreenCam turns an Android phone into a video-only webcam for OBS Studio over USB, with optional Wi-Fi streaming on a trusted local network. The USB listener is device-loopback-only and ADB forwards it to an OBS Browser Source on Windows. It does not use DroidCam, vendor-specific APIs, audio capture, or a background camera service.
 
 ## Requirements
 
@@ -30,6 +30,12 @@ adb forward tcp:8765 tcp:8765
 
 The forwarding command is for a USB-connected device; do not replace it with a network or reverse-tunnel command. GreenCam's Android listener is bound only to `127.0.0.1:8765` on the phone.
 
+### Optional: stream over trusted Wi-Fi
+
+While the camera is running, tap **Enable Wi-Fi OBS stream**. GreenCam shows a selectable OBS URL when it finds a Wi-Fi IPv4 address; paste that full URL into the OBS Browser Source. Keep the phone and OBS computer on the same trusted local network. The Wi-Fi listener is opt-in and binds only to the detected concrete Wi-Fi address; it does not use cellular or a wildcard interface.
+
+The URL includes a fresh per-run bearer token that protects access to the page and stream from casual unauthenticated requests. HTTP is plaintext: the token and video are not encrypted, and anyone who obtains the URL on the network can use it. Do not use this on public or untrusted Wi-Fi. Stopping the camera closes the Wi-Fi listener and invalidates the URL.
+
 ### 3. Add the camera to OBS
 
 1. In OBS, add a **Browser** source to a scene.
@@ -43,11 +49,12 @@ See the [OBS Browser Source guide](https://obsproject.com/kb/browser-source) for
 ## Controls and privacy
 
 - **Start camera / Stop camera** controls preview and streaming together.
+- **Enable Wi-Fi OBS stream** is an optional second listener for a trusted local Wi-Fi network; its URL is hidden when disabled, unavailable, or when the camera stops. The URL contains a bearer token, but HTTP is not encrypted and does not provide confidentiality.
 - **Dim screen (camera stays on)** covers the controls with a black screen and sets window brightness to minimum without stopping the camera or USB stream. Tap anywhere, including **Tap to restore**, to exit; the previous brightness is restored when exiting or leaving the app. This does not turn off the physical display.
 - **Rear camera / Front camera** shows the active choice; unavailable cameras cannot be selected. You can change cameras while running.
 - **Output rate (up to)** limits the MJPEG output to 10, 15, 30, or 60 FPS. The default is 15 FPS. GreenCam displays the selected camera's advertised Camera2 capture maximum and disables higher output caps when that metadata is available; unsupported or unavailable metadata is shown as **Unknown**, with the existing caps left enabled. This advertised maximum is not a measured or guaranteed stream rate: actual MJPEG throughput can be lower because of camera hardware, device load, or encoding. The output cap controls pacing only; it does not request a camera capture mode or create/interpolate frames.
-- The app requests camera permission at runtime; the `INTERNET` permission is a normal install-time permission used for the local socket. It captures video only.
-- The HTTP server listens on phone loopback only, not on Wi-Fi or cellular interfaces. ADB forwarding provides the USB bridge to the host.
+- The app requests camera permission at runtime; `INTERNET` and `ACCESS_NETWORK_STATE` are normal install-time permissions used for local sockets and Wi-Fi network detection. It captures video only.
+- The USB HTTP server listens on phone loopback only; the separately opt-in Wi-Fi listener binds only to a concrete Wi-Fi IPv4 address. ADB forwarding provides the USB bridge to the host.
 - Streaming ends when you stop the camera or leave GreenCam. No background service or cloud upload is used.
 - When finished, stop the camera in GreenCam and remove the host forward:
 
