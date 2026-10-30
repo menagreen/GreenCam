@@ -12,7 +12,7 @@ GreenCam turns an Android phone into a video-only webcam for OBS Studio over USB
 
 ### 1. Install and start GreenCam
 
-Download the [v0.1.0-alpha.3 preview APK](https://github.com/menagreen/GreenCam/releases/download/v0.1.0-alpha.3/GreenCam-v0.1.0-alpha.3-debug.apk) or build the debug APK from source below, then install it on the phone. This preview is debug-signed, not a production-signed release; a future build with a different signing key may require uninstalling it first. Open **GreenCam**, choose the available **Rear camera** or **Front camera**, select an output limit of **10**, **15**, **30**, or **60 FPS**, then tap **Start camera** and grant camera permission when Android asks. Keep GreenCam in the foreground; leaving the app stops the camera and stream.
+Download the [v0.1.0-alpha.4 preview APK](https://github.com/menagreen/GreenCam/releases/download/v0.1.0-alpha.4/GreenCam-v0.1.0-alpha.4-debug.apk) or build the debug APK from source below, then install it on the phone. This preview is debug-signed, not a production-signed release; a future build with a different signing key may require uninstalling it first. Open **GreenCam**, choose the available **Rear camera** or **Front camera**, select an output limit of **10**, **15**, **30**, or **60 FPS**, then tap **Start camera** and grant camera permission when Android asks. Keep GreenCam in the foreground; leaving the app stops the camera and stream.
 
 ### 2. Forward the stream over USB
 
