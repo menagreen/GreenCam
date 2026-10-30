@@ -41,4 +41,8 @@
     <string name="theme_light">Theme: Light</string>
     <string name="theme_dark">Theme: Dark</string>
     <string name="theme_while_streaming">Stop the camera before changing the theme</string>
+    <string name="zoom_value">Zoom: %1$.1f×</string>
+    <string name="zoom_unavailable">Zoom is unavailable for this camera</string>
+    <string name="zoom_control_description">Camera zoom level</string>
+    <string name="preview_focus_description">Camera preview. Tap to focus.</string>
 </resources>

@@ -17,6 +17,7 @@ import android.graphics.Typeface;
 import android.util.Size;
 import android.util.TypedValue;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
@@ -24,6 +25,7 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
+import android.widget.SeekBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
@@ -37,6 +39,8 @@ import androidx.camera.core.CameraInfo;
 import androidx.camera.core.CameraInfoUnavailableException;
 import androidx.camera.core.CameraSelector;
 import androidx.camera.core.Camera;
+import androidx.camera.core.FocusMeteringAction;
+import androidx.camera.core.ZoomState;
 import androidx.camera.core.ImageAnalysis;
 import androidx.camera.core.ImageProxy;
 import androidx.camera.core.Preview;
@@ -64,6 +68,8 @@ public final class MainActivity extends AppCompatActivity {
     private TextView statusView;
     private TextView selectionView;
     private TextView cameraCapabilityView;
+    private TextView zoomValueView;
+    private SeekBar zoomSeekBar;
     private Button startButton;
     private Button themeButton;
     private int themeMode;
@@ -84,6 +90,9 @@ public final class MainActivity extends AppCompatActivity {
     private boolean syncingControls;
     private ProcessCameraProvider cameraProvider;
     private CameraInfo boundCameraInfo;
+    private Camera boundCamera;
+    private float zoomMinimum = 1f;
+    private float zoomMaximum = 1f;
     private int lensFacing = CameraSelectionPolicy.LENS_BACK;
     private boolean started;
     private boolean dimScreenActive;
@@ -179,6 +188,40 @@ public final class MainActivity extends AppCompatActivity {
                 (getResources().getDisplayMetrics().widthPixels - dp(32)) * 9 / 16));
         root.addView(previewView, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, previewHeight));
+        previewView.setOnTouchListener((view, event) -> {
+            if (event.getAction() != MotionEvent.ACTION_UP || !started || boundCamera == null) {
+                return false;
+            }
+            boundCamera.getCameraControl().startFocusAndMetering(
+                    new FocusMeteringAction.Builder(previewView.getMeteringPointFactory()
+                            .createPoint(event.getX(), event.getY())).build());
+            view.performClick();
+            return true;
+        });
+        previewView.setContentDescription(getString(R.string.preview_focus_description));
+
+        zoomValueView = new TextView(this);
+        zoomValueView.setText(R.string.zoom_unavailable);
+        zoomValueView.setPadding(0, dp(12), 0, 0);
+        root.addView(zoomValueView);
+        zoomSeekBar = new SeekBar(this);
+        zoomSeekBar.setMax(100);
+        zoomSeekBar.setEnabled(false);
+        zoomSeekBar.setContentDescription(getString(R.string.zoom_control_description));
+        zoomSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                if (!fromUser || !started || boundCamera == null
+                        || !ZoomControlPolicy.supportsZoom(zoomMinimum, zoomMaximum)) {
+                    return;
+                }
+                float ratio = ZoomControlPolicy.ratioForProgress(progress, zoomMinimum, zoomMaximum);
+                boundCamera.getCameraControl().setZoomRatio(ratio);
+                zoomValueView.setText(getString(R.string.zoom_value, ratio));
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) { }
+            @Override public void onStopTrackingTouch(SeekBar seekBar) { }
+        });
+        root.addView(zoomSeekBar);
 
         statusView = new TextView(this);
         statusView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
@@ -413,6 +456,14 @@ public final class MainActivity extends AppCompatActivity {
             Camera boundCamera = cameraProvider.bindToLifecycle(
                     this, selectorFor(lensFacing), preview, analysis);
             boundCameraInfo = boundCamera.getCameraInfo();
+            this.boundCamera = boundCamera;
+            ZoomState zoomState = boundCameraInfo.getZoomState().getValue();
+            zoomMinimum = zoomState == null ? 1f : zoomState.getMinZoomRatio();
+            zoomMaximum = zoomState == null ? 1f : zoomState.getMaxZoomRatio();
+            float initialZoom = ZoomControlPolicy.initialRatio(zoomMinimum, zoomMaximum);
+            boundCamera.getCameraControl().setZoomRatio(initialZoom);
+            zoomSeekBar.setProgress(ZoomControlPolicy.progressForRatio(
+                    initialZoom, zoomMinimum, zoomMaximum));
             frameSessionId = newFrameSession;
             mjpegServer = server;
             started = true;
@@ -423,6 +474,10 @@ public final class MainActivity extends AppCompatActivity {
             updateControls();
         } catch (IllegalArgumentException | IllegalStateException exception) {
             started = false;
+            boundCamera = null;
+            boundCameraInfo = null;
+            zoomMinimum = 1f;
+            zoomMaximum = 1f;
             jpegFrames.endSession(newFrameSession);
             server.close();
             mjpegServer = null;
@@ -464,6 +519,9 @@ public final class MainActivity extends AppCompatActivity {
             cameraProvider.unbindAll();
         }
         boundCameraInfo = null;
+        boundCamera = null;
+        zoomMinimum = 1f;
+        zoomMaximum = 1f;
         if (statusView != null) {
             statusView.setText(R.string.camera_stopped);
             updateControls();
@@ -688,6 +746,13 @@ public final class MainActivity extends AppCompatActivity {
         boolean frontAvailable = hasCamera(CameraSelectionPolicy.LENS_FRONT);
         startButton.setEnabled(backAvailable || frontAvailable);
         dimScreenButton.setEnabled(started && !dimScreenActive);
+        boolean zoomSupported = started && boundCamera != null
+                && ZoomControlPolicy.supportsZoom(zoomMinimum, zoomMaximum);
+        zoomSeekBar.setEnabled(zoomSupported);
+        zoomValueView.setText(zoomSupported
+                ? getString(R.string.zoom_value, ZoomControlPolicy.ratioForProgress(
+                        zoomSeekBar.getProgress(), zoomMinimum, zoomMaximum))
+                : getString(R.string.zoom_unavailable));
         themeButton.setEnabled(!started);
         themeButton.setText(themeMode == ThemeModePolicy.DARK ? R.string.theme_dark
                 : themeMode == ThemeModePolicy.LIGHT ? R.string.theme_light : R.string.theme_system);
