@@ -8,8 +8,11 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.util.Size;
 import android.util.TypedValue;
+import android.view.Gravity;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
@@ -49,6 +52,8 @@ public final class MainActivity extends AppCompatActivity {
     private TextView selectionView;
     private TextView cameraCapabilityView;
     private Button startButton;
+    private Button dimScreenButton;
+    private FrameLayout dimOverlay;
     private RadioGroup cameraGroup;
     private RadioGroup fpsGroup;
     private RadioButton backButton;
@@ -62,6 +67,8 @@ public final class MainActivity extends AppCompatActivity {
     private CameraInfo boundCameraInfo;
     private int lensFacing = CameraSelectionPolicy.LENS_BACK;
     private boolean started;
+    private boolean dimScreenActive;
+    private float originalScreenBrightness = Float.NaN;
     private final PreviewStartGate previewStartGate = new PreviewStartGate();
     private final LatestJpegFrameStore jpegFrames = new LatestJpegFrameStore();
     private final ExecutorService analysisExecutor = Executors.newSingleThreadExecutor();
@@ -97,6 +104,7 @@ public final class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        exitDimScreenMode();
         analysisExecutor.shutdownNow();
         super.onDestroy();
     }
@@ -193,11 +201,40 @@ public final class MainActivity extends AppCompatActivity {
         startParams.topMargin = dp(12);
         root.addView(startButton, startParams);
 
+        dimScreenButton = new Button(this);
+        dimScreenButton.setText("Dim screen (camera stays on)");
+        dimScreenButton.setEnabled(false);
+        dimScreenButton.setOnClickListener(view -> enterDimScreenMode());
+        LinearLayout.LayoutParams dimParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        dimParams.topMargin = dp(8);
+        root.addView(dimScreenButton, dimParams);
+
         TextView help = new TextView(this);
         help.setText("Keep GreenCam open. On your computer, forward ADB port 8765 and add http://localhost:8765/ as an OBS Browser Source.");
         help.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
         root.addView(help);
-        setContentView(scrollView);
+        FrameLayout content = new FrameLayout(this);
+        content.addView(scrollView, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        dimOverlay = new FrameLayout(this);
+        dimOverlay.setBackgroundColor(Color.BLACK);
+        dimOverlay.setVisibility(View.GONE);
+        dimOverlay.setContentDescription("Black screen. Tap anywhere to restore the camera controls.");
+        dimOverlay.setOnClickListener(view -> exitDimScreenMode());
+        Button wakeButton = new Button(this);
+        wakeButton.setText("Tap to restore");
+        wakeButton.setTextColor(Color.DKGRAY);
+        wakeButton.setBackgroundColor(Color.rgb(8, 8, 8));
+        wakeButton.setContentDescription("Restore screen brightness and show camera controls");
+        wakeButton.setOnClickListener(view -> exitDimScreenMode());
+        FrameLayout.LayoutParams wakeParams = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.CENTER);
+        dimOverlay.addView(wakeButton, wakeParams);
+        content.addView(dimOverlay, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        setContentView(content);
     }
 
     private RadioButton cameraOption(String label, RadioGroup group) {
@@ -342,6 +379,7 @@ public final class MainActivity extends AppCompatActivity {
     }
 
     private void stopPreview() {
+        exitDimScreenMode();
         previewStartGate.cancel();
         started = false;
         jpegFrames.endSession(frameSessionId);
@@ -397,6 +435,7 @@ public final class MainActivity extends AppCompatActivity {
         boolean backAvailable = hasCamera(CameraSelectionPolicy.LENS_BACK);
         boolean frontAvailable = hasCamera(CameraSelectionPolicy.LENS_FRONT);
         startButton.setEnabled(backAvailable || frontAvailable);
+        dimScreenButton.setEnabled(started && !dimScreenActive);
         syncingControls = true;
         backButton.setEnabled(backAvailable);
         frontButton.setEnabled(frontAvailable);
@@ -425,6 +464,37 @@ public final class MainActivity extends AppCompatActivity {
             statusView.setText("Preparing camera…");
         } else if (!backAvailable && !frontAvailable) {
             statusView.setText("No camera is available on this device.");
+        }
+    }
+
+    private void enterDimScreenMode() {
+        if (!started || dimScreenActive) {
+            return;
+        }
+        WindowManager.LayoutParams attributes = getWindow().getAttributes();
+        originalScreenBrightness = attributes.screenBrightness;
+        attributes.screenBrightness = ScreenDimPolicy.minimumBrightness();
+        getWindow().setAttributes(attributes);
+        dimScreenActive = true;
+        dimOverlay.setVisibility(View.VISIBLE);
+        dimOverlay.bringToFront();
+        dimScreenButton.setEnabled(false);
+    }
+
+    private void exitDimScreenMode() {
+        if (!dimScreenActive) {
+            return;
+        }
+        WindowManager.LayoutParams attributes = getWindow().getAttributes();
+        attributes.screenBrightness = ScreenDimPolicy.brightnessToRestore(originalScreenBrightness);
+        getWindow().setAttributes(attributes);
+        originalScreenBrightness = Float.NaN;
+        dimScreenActive = false;
+        if (dimOverlay != null) {
+            dimOverlay.setVisibility(View.GONE);
+        }
+        if (dimScreenButton != null) {
+            dimScreenButton.setEnabled(started);
         }
     }
 

@@ -43,6 +43,7 @@ See the [OBS Browser Source guide](https://obsproject.com/kb/browser-source) for
 ## Controls and privacy
 
 - **Start camera / Stop camera** controls preview and streaming together.
+- **Dim screen (camera stays on)** covers the controls with a black screen and sets window brightness to minimum without stopping the camera or USB stream. Tap anywhere, including **Tap to restore**, to exit; the previous brightness is restored when exiting or leaving the app. This does not turn off the physical display.
 - **Rear camera / Front camera** shows the active choice; unavailable cameras cannot be selected. You can change cameras while running.
 - **Output rate (up to)** limits the MJPEG output to 10, 15, 30, or 60 FPS. The default is 15 FPS. GreenCam displays the selected camera's advertised Camera2 capture maximum and disables higher output caps when that metadata is available; unsupported or unavailable metadata is shown as **Unknown**, with the existing caps left enabled. This advertised maximum is not a measured or guaranteed stream rate: actual MJPEG throughput can be lower because of camera hardware, device load, or encoding. The output cap controls pacing only; it does not request a camera capture mode or create/interpolate frames.
 - The app requests camera permission at runtime; the `INTERNET` permission is a normal install-time permission used for the local socket. It captures video only.
