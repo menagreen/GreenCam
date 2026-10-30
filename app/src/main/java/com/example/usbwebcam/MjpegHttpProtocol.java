@@ -9,6 +9,7 @@ final class MjpegHttpProtocol {
         STREAM,
         METHOD_NOT_ALLOWED,
         NOT_FOUND,
+        UNAUTHORIZED,
         BAD_REQUEST
     }
 
@@ -67,6 +68,10 @@ final class MjpegHttpProtocol {
     }
 
     static byte[] errorResponse(Route route) {
+        if (route == Route.UNAUTHORIZED) {
+            return response(401, "Unauthorized", "text/plain; charset=utf-8",
+                    "Unauthorized".getBytes(StandardCharsets.UTF_8));
+        }
         if (route == Route.METHOD_NOT_ALLOWED) {
             return response(405, "Method Not Allowed", "text/plain; charset=utf-8",
                     "Method Not Allowed".getBytes(StandardCharsets.UTF_8));

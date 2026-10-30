@@ -29,7 +29,7 @@ The user requested multiple camera and usability improvements. The first selecte
 
 ## Tasks
 - [x] T1 — Implement reversible black/minimum-brightness screen mode, tests, and README. RED observed before implementation (unit-test compile failed because `ScreenDimPolicy` was absent); GREEN observed with `testDebugUnitTest` in the full check below.
-- [ ] T2 — Wi-Fi enhancements. Pending user backlog; not scoped or implemented.
+- [ ] T2 — Wi-Fi enhancements. Split into bounded units: (a) add transport-independent, per-session token authentication for the future listener; (b) bind/configure Wi-Fi transport and expose its lifecycle/UI. This commit implements only (a); USB loopback remains unauthenticated and unchanged. The future Wi-Fi listener must be configured with the token protector so both index and stream routes are guarded. No permission, listener binding, or UI changes in (a).
 - [ ] T3 — ADB-free transport. Pending user backlog; not scoped or implemented.
 - [ ] T4 — Windows desktop companion/filters. Pending user backlog; not scoped or implemented.
 - [ ] T5 — Physical rear lenses. Pending user backlog; not scoped or implemented.
@@ -41,7 +41,11 @@ The user requested multiple camera and usability improvements. The first selecte
 ## Progress and next step
 T1 implementation complete. Verification: `gradlew.bat testDebugUnitTest assembleDebug lintDebug --offline --console=plain` succeeded; `git diff --check` succeeded. Runtime/device harness: Huawei VOG-L04 smoke passed. The overlay covered 99.82% of the app area with pixels below RGB 20; Android window brightness reported `sbrt=0.0`; a valid JPEG streamed while dimmed. Tap restored controls/default brightness, and Stop closed the stream. Device luminance was not measured. Rollback boundary: revert the single T1 commit to remove the dim UI, brightness handling, policy tests, and documentation together. Commit identity: `e2d6221` (`feat(camera): add reversible dim screen mode`). Engram mirror pending (no authoritative session identity available and parent requested no Engram writes).
 
+T2a route: delegated direct (bounded writer). Trigger evidence: auth policy, parser, and unit tests form a multi-file behavior change; CodeGraph mapped `MjpegHttpServer` request routing and its test callers before edits. Strict TDD is enabled; runner: `gradlew.bat testDebugUnitTest`. RED observed first: test compilation failed because `MjpegRequestAuthenticator` did not exist. Implemented a 128-bit `SecureRandom` lowercase-hex session token, strict single `token` query parsing, `MessageDigest.isEqual` credential comparison, optional protected-server enforcement returning 400 for malformed targets and 401 for absent/incorrect credentials, and tests for index + stream protection. The existing constructor remains unprotected for USB loopback. Full verification succeeded: `gradlew.bat testDebugUnitTest assembleDebug lintDebug --offline --console=plain`; `git diff --check` succeeded. Runtime/device harness: N/A; no listener binds in T2a. Rollback boundary: revert the T2a auth/parser behavior, its tests, and task progress; does not remove USB compatibility. Commit identity pending.
+
 ## Relevant files
 - `app/src/main/java/com/example/usbwebcam/MainActivity.java` — Android camera UI and lifecycle.
+- `app/src/main/java/com/example/usbwebcam/MjpegRequestAuthenticator.java` — transport-independent per-session request-token validation.
+- `app/src/main/java/com/example/usbwebcam/MjpegHttpServer.java` — optional protected HTTP request parsing; default remains unprotected.
 - `app/src/test/java/com/example/usbwebcam/` — local unit tests.
 - `README.md` — user-facing feature documentation.
