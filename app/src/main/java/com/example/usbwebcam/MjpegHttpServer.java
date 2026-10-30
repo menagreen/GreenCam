@@ -23,6 +23,7 @@ final class MjpegHttpServer implements AutoCloseable {
 
     private final LatestJpegFrameStore frames;
     private final int port;
+    private final MjpegRequestAuthenticator authenticator;
     private final AtomicBoolean running = new AtomicBoolean();
     private final AtomicReference<Socket> activeStream = new AtomicReference<>();
     private final ExecutorService streamExecutor = Executors.newSingleThreadExecutor(runnable -> {
@@ -38,6 +39,10 @@ final class MjpegHttpServer implements AutoCloseable {
     }
 
     MjpegHttpServer(LatestJpegFrameStore frames, int port) {
+        this(frames, port, null);
+    }
+
+    MjpegHttpServer(LatestJpegFrameStore frames, int port, MjpegRequestAuthenticator authenticator) {
         if (frames == null) {
             throw new IllegalArgumentException("Frame store is required");
         }
@@ -46,6 +51,7 @@ final class MjpegHttpServer implements AutoCloseable {
         }
         this.frames = frames;
         this.port = port;
+        this.authenticator = authenticator;
     }
 
     synchronized void start() throws IOException {
@@ -101,7 +107,8 @@ final class MjpegHttpServer implements AutoCloseable {
             MjpegHttpProtocol.Route route = request.route;
             OutputStream output = client.getOutputStream();
             if (route == MjpegHttpProtocol.Route.INDEX) {
-                output.write(MjpegHttpProtocol.indexResponse());
+                output.write(authenticator == null ? MjpegHttpProtocol.indexResponse()
+                        : MjpegHttpProtocol.indexResponse(authenticator.tokenForSession()));
                 output.flush();
             } else if (route == MjpegHttpProtocol.Route.STREAM) {
                 if (!activeStream.compareAndSet(null, client)) {
@@ -152,7 +159,18 @@ final class MjpegHttpServer implements AutoCloseable {
                 break;
             }
         }
-        return new Request(MjpegHttpProtocol.route(fields[0], fields[1]));
+        if (authenticator == null) {
+            return new Request(MjpegHttpProtocol.route(fields[0], fields[1]));
+        }
+        MjpegRequestAuthenticator.ParseResult parsed = MjpegRequestAuthenticator.parseProtectedTarget(
+                fields[1], authenticator.tokenForSession());
+        if (parsed.malformed) {
+            return new Request(MjpegHttpProtocol.Route.BAD_REQUEST);
+        }
+        if (!parsed.authorized) {
+            return new Request(MjpegHttpProtocol.Route.UNAUTHORIZED);
+        }
+        return new Request(MjpegHttpProtocol.route(fields[0], parsed.path));
     }
 
     private String readLine(InputStream input, int maxBytes) throws IOException {

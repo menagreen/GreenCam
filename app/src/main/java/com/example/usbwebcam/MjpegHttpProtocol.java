@@ -9,6 +9,7 @@ final class MjpegHttpProtocol {
         STREAM,
         METHOD_NOT_ALLOWED,
         NOT_FOUND,
+        UNAUTHORIZED,
         BAD_REQUEST
     }
 
@@ -42,6 +43,18 @@ final class MjpegHttpProtocol {
         return response(200, "OK", "text/html; charset=utf-8", INDEX_PAGE);
     }
 
+    static byte[] indexResponse(String token) {
+        return response(200, "OK", "text/html; charset=utf-8",
+                indexPage(token).getBytes(StandardCharsets.UTF_8));
+    }
+
+    static String indexPage(String token) {
+        if (token == null || !token.matches("[0-9a-f]{32}")) {
+            throw new IllegalArgumentException("Token must contain 128 bits encoded as lowercase hex");
+        }
+        return indexPage().replace("src=\"/stream.mjpg\"", "src=\"/stream.mjpg?token=" + token + "\"");
+    }
+
     static byte[] streamHeaders() {
         return ("HTTP/1.1 200 OK\r\n"
                 + "Content-Type: multipart/x-mixed-replace; boundary=" + BOUNDARY + "\r\n"
@@ -67,6 +80,10 @@ final class MjpegHttpProtocol {
     }
 
     static byte[] errorResponse(Route route) {
+        if (route == Route.UNAUTHORIZED) {
+            return response(401, "Unauthorized", "text/plain; charset=utf-8",
+                    "Unauthorized".getBytes(StandardCharsets.UTF_8));
+        }
         if (route == Route.METHOD_NOT_ALLOWED) {
             return response(405, "Method Not Allowed", "text/plain; charset=utf-8",
                     "Method Not Allowed".getBytes(StandardCharsets.UTF_8));

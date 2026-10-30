@@ -75,6 +75,40 @@ public class MjpegHttpServerTest {
         }
     }
 
+    @Test
+    public void protectsIndexAndStreamOnlyWhenAuthenticatorIsConfigured() throws Exception {
+        LatestJpegFrameStore frames = new LatestJpegFrameStore();
+        long session = frames.beginSession();
+        frames.publish(session, new byte[] {(byte) 0xff, (byte) 0xd8, (byte) 0xff, (byte) 0xd9});
+        MjpegRequestAuthenticator authenticator = new MjpegRequestAuthenticator(
+                "0123456789abcdef0123456789abcdef");
+        String streamPath = "/stream.mjpg?token=" + authenticator.tokenForSession();
+        MjpegHttpServer protectedServer = new MjpegHttpServer(frames, 0, authenticator);
+        protectedServer.start();
+
+        try {
+            assertTrue(request(protectedServer.getLocalPort(), "GET / HTTP/1.1\r\n\r\n")
+                    .startsWith("HTTP/1.1 401 Unauthorized\r\n"));
+            assertTrue(request(protectedServer.getLocalPort(), "GET /stream.mjpg?token=ffffffffffffffffffffffffffffffff HTTP/1.1\r\n\r\n")
+                    .startsWith("HTTP/1.1 401 Unauthorized\r\n"));
+            assertTrue(request(protectedServer.getLocalPort(), "GET /?token=" + authenticator.tokenForSession()
+                    + "&token=" + authenticator.tokenForSession() + " HTTP/1.1\r\n\r\n")
+                    .startsWith("HTTP/1.1 400 Bad Request\r\n"));
+            String protectedIndex = request(protectedServer.getLocalPort(), "GET /?token="
+                    + authenticator.tokenForSession() + " HTTP/1.1\r\n\r\n");
+            assertTrue(protectedIndex.startsWith("HTTP/1.1 200 OK\r\n"));
+            assertTrue(protectedIndex.contains("src=\"" + streamPath + "\""));
+            try (Socket stream = connect(protectedServer.getLocalPort())) {
+                stream.getOutputStream().write(("GET " + streamPath + " HTTP/1.1\r\n\r\n")
+                        .getBytes(StandardCharsets.US_ASCII));
+                stream.getOutputStream().flush();
+                assertTrue(readHeaders(stream.getInputStream()).startsWith("HTTP/1.1 200 OK\r\n"));
+            }
+        } finally {
+            protectedServer.close();
+        }
+    }
+
     private static Socket connect(int port) throws Exception {
         Socket socket = new Socket(InetAddress.getByName("127.0.0.1"), port);
         socket.setSoTimeout(3000);
