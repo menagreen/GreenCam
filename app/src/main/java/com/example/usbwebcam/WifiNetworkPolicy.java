@@ -22,6 +22,11 @@ final class WifiNetworkPolicy {
         return cameraRunning && enabled && isConcreteIpv4(address);
     }
 
+    static boolean canCopyObsUrl(boolean cameraRunning, boolean enabled,
+            boolean listenerRunning, String address, boolean tokenReady) {
+        return shouldListen(cameraRunning, enabled, address) && listenerRunning && tokenReady;
+    }
+
     static String desiredListenerAddress(boolean cameraRunning, boolean enabled,
             List<String> candidates) {
         return cameraRunning && enabled ? chooseAddress(candidates) : null;
