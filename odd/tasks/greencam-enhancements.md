@@ -36,9 +36,9 @@ The user requested multiple camera and usability improvements. The first selecte
 - [ ] T4 — Windows desktop companion/filters. Pending user backlog; not scoped or implemented.
 - [ ] T5 — Physical rear lenses. Pending user backlog; not scoped or implemented.
 - [ ] T6 — Zoom/focus. Pending user backlog; not scoped or implemented.
-- [x] T7 — Dark mode. Persist a Follow system / Light / Dark choice using AppCompat DayNight. Theme changes are disabled while streaming because an Activity recreation would interrupt the camera; device visual verification remains pending.
+- [x] T7 — Dark mode. Persist a Follow system / Light / Dark choice using AppCompat DayNight. Theme changes are disabled while streaming because an Activity recreation would interrupt the camera; Huawei Android 10 smoke observed dark mode and an es-MX UI; theme selection was disabled during streaming and reenabled after Stop. English-device rendering and color contrast were not independently checked.
 - [ ] T8 — Menu/aesthetic UI. Pending user backlog; not scoped or implemented.
-- [x] T9 — Multilingual support. Extract Android UI copy to resources with English baseline and neutral Spanish translation; follow the device language with English fallback. Device language smoke remains pending.
+- [x] T9 — Multilingual support. Extract Android UI copy to resources with English baseline and neutral Spanish translation; follow the device language with English fallback. Huawei device language es-MX was observed without changing the system locale; English-device rendering and browser-page localization remain unverified.
 
 ## Progress and next step
 T7/T9 route: delegated direct (Activity behavior, policy/test, styles, and locale resources). Strict TDD RED: `testDebugUnitTest` failed compilation before `ThemeModePolicy` existed; GREEN: `testDebugUnitTest assembleDebug lintDebug --offline --console=plain` passed, as did `git diff --check`. AppCompat DayNight follows the system by default and stores explicit mode selection in Activity preferences. Theme choice is unavailable while the camera runs to avoid silently ending a stream during Activity recreation. English and neutral Spanish Android UI strings now use Android resources; browser-served MJPEG page and platform permission prompt remain outside this locale scope. Work-unit commit: `2f359bd` (`feat(ui): add persisted theme modes and Spanish localization`), 238 authored changed lines. No device smoke, push, PR, release, or Engram write was performed. Next: validate light/dark and Spanish rendering on a device; implement unrelated backlog separately.
@@ -61,3 +61,5 @@ Release preparation for alpha.5: Android versionCode 5 / versionName 0.1.0-alpha
 - `app/src/main/java/com/example/usbwebcam/MjpegHttpServer.java` — optional protected HTTP request parsing; default remains unprotected.
 - `app/src/test/java/com/example/usbwebcam/` — local unit tests.
 - `README.md` — user-facing feature documentation.
+
+Alpha.6 release preparation: Huawei es-MX and dark-theme controls passed independent smoke; no English-device or browser-page locale test was run. Android metadata and README download link target 0.1.0-alpha.6. Merge and release remain pending.
