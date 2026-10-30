@@ -32,6 +32,7 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.OptIn;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.app.AppCompatDelegate;
 import androidx.camera.core.CameraInfo;
 import androidx.camera.core.CameraInfoUnavailableException;
 import androidx.camera.core.CameraSelector;
@@ -64,6 +65,8 @@ public final class MainActivity extends AppCompatActivity {
     private TextView selectionView;
     private TextView cameraCapabilityView;
     private Button startButton;
+    private Button themeButton;
+    private int themeMode;
     private Button dimScreenButton;
     private Button wifiButton;
     private TextView wifiWarningView;
@@ -106,13 +109,17 @@ public final class MainActivity extends AppCompatActivity {
                     startPreview();
                 } else {
                     previewStartGate.cancel();
-                    statusView.setText("Camera permission is required to start preview.");
+                    statusView.setText(R.string.camera_permission_required);
                     updateControls();
                 }
             });
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        themeMode = ThemeModePolicy.sanitize(getPreferences(MODE_PRIVATE).getInt("theme_mode", ThemeModePolicy.SYSTEM));
+        AppCompatDelegate.setDefaultNightMode(themeMode == ThemeModePolicy.DARK
+                ? AppCompatDelegate.MODE_NIGHT_YES : themeMode == ThemeModePolicy.LIGHT
+                ? AppCompatDelegate.MODE_NIGHT_NO : AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
         super.onCreate(savedInstanceState);
         createLayout();
         updateControls();
@@ -142,15 +149,28 @@ public final class MainActivity extends AppCompatActivity {
         scrollView.addView(root);
 
         TextView title = new TextView(this);
-        title.setText("GreenCam");
+        title.setText(R.string.app_name);
         title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 24);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         root.addView(title);
 
         TextView subtitle = new TextView(this);
-        subtitle.setText("Your USB camera for OBS");
+        subtitle.setText(R.string.subtitle);
         subtitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         root.addView(subtitle);
+
+        themeButton = new Button(this);
+        themeButton.setOnClickListener(view -> {
+            if (started) {
+                return;
+            }
+            themeMode = ThemeModePolicy.next(themeMode);
+            getPreferences(MODE_PRIVATE).edit().putInt("theme_mode", themeMode).apply();
+            AppCompatDelegate.setDefaultNightMode(themeMode == ThemeModePolicy.DARK
+                    ? AppCompatDelegate.MODE_NIGHT_YES : themeMode == ThemeModePolicy.LIGHT
+                    ? AppCompatDelegate.MODE_NIGHT_NO : AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+        });
+        root.addView(themeButton);
 
         previewView = new PreviewView(this);
         previewView.setImplementationMode(PreviewView.ImplementationMode.COMPATIBLE);
@@ -175,16 +195,16 @@ public final class MainActivity extends AppCompatActivity {
         root.addView(cameraCapabilityView);
 
         TextView cameraLabel = new TextView(this);
-        cameraLabel.setText("Camera");
+        cameraLabel.setText(R.string.camera);
         cameraLabel.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
         cameraLabel.setPadding(0, dp(16), 0, 0);
         root.addView(cameraLabel);
 
         cameraGroup = new RadioGroup(this);
         cameraGroup.setOrientation(RadioGroup.HORIZONTAL);
-        cameraGroup.setContentDescription("Camera selection");
-        backButton = cameraOption("Rear camera", cameraGroup);
-        frontButton = cameraOption("Front camera", cameraGroup);
+        cameraGroup.setContentDescription(getString(R.string.camera_selection));
+        backButton = cameraOption(getString(R.string.rear_camera), cameraGroup);
+        frontButton = cameraOption(getString(R.string.front_camera), cameraGroup);
         cameraGroup.setOnCheckedChangeListener((group, checkedId) -> {
             if (!syncingControls) {
                 selectCamera(checkedId == frontButton.getId()
@@ -194,14 +214,14 @@ public final class MainActivity extends AppCompatActivity {
         root.addView(cameraGroup);
 
         TextView fpsLabel = new TextView(this);
-        fpsLabel.setText("Output rate (up to)");
+        fpsLabel.setText(R.string.output_rate);
         fpsLabel.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
         fpsLabel.setPadding(0, dp(12), 0, 0);
         root.addView(fpsLabel);
 
         fpsGroup = new RadioGroup(this);
         fpsGroup.setOrientation(RadioGroup.HORIZONTAL);
-        fpsGroup.setContentDescription("Output frame rate limit");
+        fpsGroup.setContentDescription(getString(R.string.output_frame_rate_limit));
         fps10Button = fpsOption(10);
         fps15Button = fpsOption(15);
         fps30Button = fpsOption(30);
@@ -226,7 +246,7 @@ public final class MainActivity extends AppCompatActivity {
         root.addView(startButton, startParams);
 
         dimScreenButton = new Button(this);
-        dimScreenButton.setText("Dim screen (camera stays on)");
+        dimScreenButton.setText(R.string.dim_screen);
         dimScreenButton.setEnabled(false);
         dimScreenButton.setOnClickListener(view -> enterDimScreenMode());
         LinearLayout.LayoutParams dimParams = new LinearLayout.LayoutParams(
@@ -235,7 +255,7 @@ public final class MainActivity extends AppCompatActivity {
         root.addView(dimScreenButton, dimParams);
 
         wifiButton = new Button(this);
-        wifiButton.setText("Enable Wi-Fi OBS stream");
+        wifiButton.setText(R.string.enable_wifi);
         wifiButton.setEnabled(false);
         wifiButton.setOnClickListener(view -> setWifiEnabled(!wifiEnabled));
         LinearLayout.LayoutParams wifiParams = new LinearLayout.LayoutParams(
@@ -243,7 +263,7 @@ public final class MainActivity extends AppCompatActivity {
         wifiParams.topMargin = dp(8);
         root.addView(wifiButton, wifiParams);
         wifiWarningView = new TextView(this);
-        wifiWarningView.setText("Wi-Fi streaming is for a trusted local network only. The URL contains a bearer token; HTTP is not encrypted and the token is not confidentiality protection.");
+        wifiWarningView.setText(R.string.wifi_warning);
         wifiWarningView.setVisibility(View.GONE);
         wifiWarningView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
         root.addView(wifiWarningView);
@@ -252,14 +272,14 @@ public final class MainActivity extends AppCompatActivity {
         wifiUrlView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         root.addView(wifiUrlView);
         wifiCopyButton = new Button(this);
-        wifiCopyButton.setText("Copy OBS URL");
-        wifiCopyButton.setContentDescription("Copy protected Wi-Fi OBS URL to clipboard");
+        wifiCopyButton.setText(R.string.copy_obs_url);
+        wifiCopyButton.setContentDescription(getString(R.string.copy_obs_description));
         wifiCopyButton.setVisibility(View.GONE);
         wifiCopyButton.setOnClickListener(view -> copyWifiObsUrl());
         root.addView(wifiCopyButton);
 
         TextView help = new TextView(this);
-        help.setText("Keep GreenCam open. On your computer, forward ADB port 8765 and add http://localhost:8765/ as an OBS Browser Source.");
+        help.setText(R.string.help);
         help.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
         root.addView(help);
         FrameLayout content = new FrameLayout(this);
@@ -268,13 +288,13 @@ public final class MainActivity extends AppCompatActivity {
         dimOverlay = new FrameLayout(this);
         dimOverlay.setBackgroundColor(Color.BLACK);
         dimOverlay.setVisibility(View.GONE);
-        dimOverlay.setContentDescription("Black screen. Tap anywhere to restore the camera controls.");
+        dimOverlay.setContentDescription(getString(R.string.black_screen_description));
         dimOverlay.setOnClickListener(view -> exitDimScreenMode());
         Button wakeButton = new Button(this);
-        wakeButton.setText("Tap to restore");
+        wakeButton.setText(R.string.tap_to_restore);
         wakeButton.setTextColor(Color.DKGRAY);
         wakeButton.setBackgroundColor(Color.rgb(8, 8, 8));
-        wakeButton.setContentDescription("Restore screen brightness and show camera controls");
+        wakeButton.setContentDescription(getString(R.string.restore_description));
         wakeButton.setOnClickListener(view -> exitDimScreenMode());
         FrameLayout.LayoutParams wakeParams = new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT,
@@ -295,8 +315,8 @@ public final class MainActivity extends AppCompatActivity {
     }
 
     private RadioButton fpsOption(int fps) {
-        RadioButton button = cameraOption(fps + " FPS", fpsGroup);
-        button.setContentDescription("Up to " + fps + " frames per second");
+        RadioButton button = cameraOption(getString(R.string.fps_option, fps), fpsGroup);
+        button.setContentDescription(getString(R.string.fps_description, fps));
         return button;
     }
 
@@ -318,7 +338,7 @@ public final class MainActivity extends AppCompatActivity {
                 if (exception instanceof InterruptedException) {
                     Thread.currentThread().interrupt();
                 }
-                statusView.setText("Camera is unavailable on this device.");
+                statusView.setText(R.string.camera_unavailable);
                 startButton.setEnabled(false);
             }
         }, ContextCompat.getMainExecutor(this));
@@ -348,7 +368,7 @@ public final class MainActivity extends AppCompatActivity {
 
     private void attemptStartPreview() {
         if (cameraProvider == null) {
-            statusView.setText("Preparing camera…");
+            statusView.setText(R.string.preparing_camera);
             return;
         }
         boolean permissionGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
@@ -357,7 +377,7 @@ public final class MainActivity extends AppCompatActivity {
             return;
         }
         if (!hasCamera(lensFacing)) {
-            statusView.setText("No camera is available.");
+            statusView.setText(R.string.no_camera);
             return;
         }
 
@@ -369,7 +389,7 @@ public final class MainActivity extends AppCompatActivity {
                 server.start();
             } catch (IOException exception) {
                 jpegFrames.endSession(newFrameSession);
-                statusView.setText("Unable to start the local USB stream.");
+                statusView.setText(R.string.local_stream_failed);
                 updateControls();
                 return;
             }
@@ -396,7 +416,7 @@ public final class MainActivity extends AppCompatActivity {
             frameSessionId = newFrameSession;
             mjpegServer = server;
             started = true;
-            statusView.setText("Camera preview and USB stream are running.");
+            statusView.setText(R.string.camera_running);
             if (wifiEnabled) {
                 registerWifiNetworkCallback();
             }
@@ -407,7 +427,7 @@ public final class MainActivity extends AppCompatActivity {
             server.close();
             mjpegServer = null;
             frameSessionId = 0;
-            statusView.setText("Unable to start camera preview.");
+            statusView.setText(R.string.preview_failed);
             updateControls();
         }
     }
@@ -445,7 +465,7 @@ public final class MainActivity extends AppCompatActivity {
         }
         boundCameraInfo = null;
         if (statusView != null) {
-            statusView.setText("Camera preview stopped.");
+            statusView.setText(R.string.camera_stopped);
             updateControls();
         }
     }
@@ -580,7 +600,7 @@ public final class MainActivity extends AppCompatActivity {
             hideWifiUrl();
             return;
         }
-        wifiUrlView.setText("Wi-Fi stream ready. Copy the protected URL for OBS.");
+        wifiUrlView.setText(R.string.wifi_ready);
         wifiUrlView.setVisibility(View.VISIBLE);
         wifiCopyButton.setVisibility(View.VISIBLE);
     }
@@ -596,11 +616,11 @@ public final class MainActivity extends AppCompatActivity {
                 wifiAuthenticator.tokenForSession());
         ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
         if (url == null || clipboard == null) {
-            wifiUrlView.setText("Unable to copy OBS URL.");
+            wifiUrlView.setText(R.string.copy_failed);
             return;
         }
-        clipboard.setPrimaryClip(ClipData.newPlainText("GreenCam OBS URL", url));
-        wifiUrlView.setText("OBS URL copied. Paste it into OBS on a trusted network.");
+        clipboard.setPrimaryClip(ClipData.newPlainText(getString(R.string.clipboard_label), url));
+        wifiUrlView.setText(R.string.copy_success);
     }
 
     private void hideWifiUrl() {
@@ -663,13 +683,18 @@ public final class MainActivity extends AppCompatActivity {
         if (startButton == null) {
             return;
         }
-        startButton.setText(started ? "Stop camera" : "Start camera");
+        startButton.setText(started ? R.string.stop_camera : R.string.start_camera);
         boolean backAvailable = hasCamera(CameraSelectionPolicy.LENS_BACK);
         boolean frontAvailable = hasCamera(CameraSelectionPolicy.LENS_FRONT);
         startButton.setEnabled(backAvailable || frontAvailable);
         dimScreenButton.setEnabled(started && !dimScreenActive);
+        themeButton.setEnabled(!started);
+        themeButton.setText(themeMode == ThemeModePolicy.DARK ? R.string.theme_dark
+                : themeMode == ThemeModePolicy.LIGHT ? R.string.theme_light : R.string.theme_system);
+        themeButton.setContentDescription(started ? getString(R.string.theme_while_streaming)
+                : themeButton.getText());
         wifiButton.setEnabled(started);
-        wifiButton.setText(wifiEnabled ? "Disable Wi-Fi OBS stream" : "Enable Wi-Fi OBS stream");
+        wifiButton.setText(wifiEnabled ? R.string.disable_wifi : R.string.enable_wifi);
         wifiWarningView.setVisibility(wifiEnabled ? View.VISIBLE : View.GONE);
         syncingControls = true;
         backButton.setEnabled(backAvailable);
@@ -689,16 +714,16 @@ public final class MainActivity extends AppCompatActivity {
                 : maxFps == 30 ? fps30Button.getId()
                 : maxFps == 60 ? fps60Button.getId() : fps15Button.getId());
         syncingControls = false;
-        selectionView.setText((lensFacing == CameraSelectionPolicy.LENS_FRONT
-                ? "Front camera" : "Rear camera") + " · Up to " + maxFps + " FPS");
+        selectionView.setText(getString(R.string.selection_summary,
+                getString(lensFacing == CameraSelectionPolicy.LENS_FRONT
+                        ? R.string.front_camera : R.string.rear_camera), maxFps));
         cameraCapabilityView.setText(advertisedMaximum == FpsCapabilityPolicy.UNKNOWN_MAX_FPS
-                ? "Camera capture maximum: Unknown. Output FPS is a limit, not measured throughput."
-                : "Camera advertises up to " + advertisedMaximum
-                        + " FPS; actual output may be lower.");
+                ? getString(R.string.capability_unknown)
+                : getString(R.string.capability_known, advertisedMaximum));
         if (cameraProvider == null) {
-            statusView.setText("Preparing camera…");
+            statusView.setText(R.string.preparing_camera);
         } else if (!backAvailable && !frontAvailable) {
-            statusView.setText("No camera is available on this device.");
+            statusView.setText(R.string.no_camera_device);
         }
     }
 
