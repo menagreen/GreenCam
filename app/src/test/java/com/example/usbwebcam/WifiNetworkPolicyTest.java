@@ -57,4 +57,20 @@ public class WifiNetworkPolicyTest {
         assertNull(WifiNetworkPolicy.obsUrl(null, 8765, "0123456789abcdef0123456789abcdef"));
         assertNull(WifiNetworkPolicy.obsUrl("0.0.0.0", 8765, "0123456789abcdef0123456789abcdef"));
     }
+
+    @Test
+    public void copyActionRequiresActiveProtectedWifiListener() {
+        assertTrue(WifiNetworkPolicy.canCopyObsUrl(true, true, true,
+                "192.168.1.24", true));
+        assertFalse(WifiNetworkPolicy.canCopyObsUrl(false, true, true,
+                "192.168.1.24", true));
+        assertFalse(WifiNetworkPolicy.canCopyObsUrl(true, false, true,
+                "192.168.1.24", true));
+        assertFalse(WifiNetworkPolicy.canCopyObsUrl(true, true, false,
+                "192.168.1.24", true));
+        assertFalse(WifiNetworkPolicy.canCopyObsUrl(true, true, true,
+                "0.0.0.0", true));
+        assertFalse(WifiNetworkPolicy.canCopyObsUrl(true, true, true,
+                "192.168.1.24", false));
+    }
 }

@@ -32,9 +32,9 @@ The forwarding command is for a USB-connected device; do not replace it with a n
 
 ### Optional: stream over trusted Wi-Fi
 
-While the camera is running, tap **Enable Wi-Fi OBS stream**. GreenCam shows a selectable OBS URL when it finds a Wi-Fi IPv4 address; paste that full URL into the OBS Browser Source. Keep the phone and OBS computer on the same trusted local network. The Wi-Fi listener is opt-in and binds only to the detected concrete Wi-Fi address; it does not use cellular or a wildcard interface.
+While the camera is running, tap **Enable Wi-Fi OBS stream**. When the stream is ready, tap **Copy OBS URL** and paste it into the OBS Browser Source. GreenCam does not show the tokenized URL on its normal screen. Keep the phone and OBS computer on the same trusted local network. The Wi-Fi listener is opt-in and binds only to the detected concrete Wi-Fi address; it does not use cellular or a wildcard interface.
 
-The URL includes a fresh per-run bearer token that protects access to the page and stream from casual unauthenticated requests. HTTP is plaintext: the token and video are not encrypted, and anyone who obtains the URL on the network can use it. Do not use this on public or untrusted Wi-Fi. Stopping the camera closes the Wi-Fi listener and invalidates the URL.
+The URL includes a fresh per-run bearer token that protects access to the page and stream from casual unauthenticated requests. Copying it temporarily places that secret on the Android clipboard, where other software may access it. HTTP is plaintext: the token and video are not encrypted, and anyone who obtains the URL on the network can use it. Do not use this on public or untrusted Wi-Fi. Stopping the camera closes the Wi-Fi listener and invalidates the URL.
 
 ### 3. Add the camera to OBS
 

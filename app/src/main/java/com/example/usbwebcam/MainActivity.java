@@ -2,6 +2,8 @@ package com.example.usbwebcam;
 
 import android.Manifest;
 import android.content.Context;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.pm.PackageManager;
 import android.net.ConnectivityManager;
 import android.net.LinkAddress;
@@ -66,6 +68,7 @@ public final class MainActivity extends AppCompatActivity {
     private Button wifiButton;
     private TextView wifiWarningView;
     private TextView wifiUrlView;
+    private Button wifiCopyButton;
     private FrameLayout dimOverlay;
     private RadioGroup cameraGroup;
     private RadioGroup fpsGroup;
@@ -245,10 +248,15 @@ public final class MainActivity extends AppCompatActivity {
         wifiWarningView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
         root.addView(wifiWarningView);
         wifiUrlView = new TextView(this);
-        wifiUrlView.setTextIsSelectable(true);
         wifiUrlView.setVisibility(View.GONE);
         wifiUrlView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         root.addView(wifiUrlView);
+        wifiCopyButton = new Button(this);
+        wifiCopyButton.setText("Copy OBS URL");
+        wifiCopyButton.setContentDescription("Copy protected Wi-Fi OBS URL to clipboard");
+        wifiCopyButton.setVisibility(View.GONE);
+        wifiCopyButton.setOnClickListener(view -> copyWifiObsUrl());
+        root.addView(wifiCopyButton);
 
         TextView help = new TextView(this);
         help.setText("Keep GreenCam open. On your computer, forward ADB port 8765 and add http://localhost:8765/ as an OBS Browser Source.");
@@ -566,25 +574,42 @@ public final class MainActivity extends AppCompatActivity {
     }
 
     private void refreshWifiUrl() {
-        if (!WifiNetworkPolicy.shouldListen(started, wifiEnabled, wifiAddress)
-                || wifiServer == null || !wifiServer.isRunning() || wifiAuthenticator == null) {
+        if (!WifiNetworkPolicy.canCopyObsUrl(started, wifiEnabled,
+                wifiServer != null && wifiServer.isRunning(), wifiAddress,
+                wifiAuthenticator != null)) {
+            hideWifiUrl();
+            return;
+        }
+        wifiUrlView.setText("Wi-Fi stream ready. Copy the protected URL for OBS.");
+        wifiUrlView.setVisibility(View.VISIBLE);
+        wifiCopyButton.setVisibility(View.VISIBLE);
+    }
+
+    private void copyWifiObsUrl() {
+        if (!WifiNetworkPolicy.canCopyObsUrl(started, wifiEnabled,
+                wifiServer != null && wifiServer.isRunning(), wifiAddress,
+                wifiAuthenticator != null)) {
             hideWifiUrl();
             return;
         }
         String url = WifiNetworkPolicy.obsUrl(wifiAddress, wifiServer.getLocalPort(),
                 wifiAuthenticator.tokenForSession());
-        if (url == null) {
-            hideWifiUrl();
+        ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+        if (url == null || clipboard == null) {
+            wifiUrlView.setText("Unable to copy OBS URL.");
             return;
         }
-        wifiUrlView.setText("OBS URL (tap and hold to copy):\n" + url);
-        wifiUrlView.setVisibility(View.VISIBLE);
+        clipboard.setPrimaryClip(ClipData.newPlainText("GreenCam OBS URL", url));
+        wifiUrlView.setText("OBS URL copied. Paste it into OBS on a trusted network.");
     }
 
     private void hideWifiUrl() {
         if (wifiUrlView != null) {
             wifiUrlView.setText("");
             wifiUrlView.setVisibility(View.GONE);
+        }
+        if (wifiCopyButton != null) {
+            wifiCopyButton.setVisibility(View.GONE);
         }
     }
 
