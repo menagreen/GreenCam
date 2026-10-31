@@ -7,6 +7,13 @@ public sealed record PairingSession(string Host, string Token, int Port);
 
 public sealed class PairingClient(HttpClient http) : IDisposable
 {
+    public static HttpClientHandler CreateLanHandler() => new()
+    {
+        UseProxy = false,
+        AllowAutoRedirect = false,
+        UseCookies = false
+    };
+
     public async Task<PairingSession> PairAsync(string host, string code,
         CancellationToken cancellationToken)
     {

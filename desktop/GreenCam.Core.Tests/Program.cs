@@ -35,6 +35,9 @@ using var client = new PairingClient(http);
 var session = await client.PairAsync("192.168.1.42", "123456", CancellationToken.None);
 Equal("192.168.1.42", session.Host);
 Equal(8765, session.Port);
+using var lanHandler = PairingClient.CreateLanHandler();
+Equal(false, lanHandler.UseProxy);
+Equal(false, lanHandler.AllowAutoRedirect);
 Console.WriteLine("All desktop core tests passed.");
 
 sealed class StubHandler : HttpMessageHandler

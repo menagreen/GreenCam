@@ -81,7 +81,10 @@ public sealed class MainForm : Form
 
         try
         {
-            using var http = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
+            using var http = new HttpClient(PairingClient.CreateLanHandler())
+            {
+                Timeout = Timeout.InfiniteTimeSpan
+            };
             using var client = new PairingClient(http);
             status.Text = "Waiting for approval on the phone…";
             var session = await client.PairAsync(phoneAddress.Text, pairingCode.Text, cancellationToken);
