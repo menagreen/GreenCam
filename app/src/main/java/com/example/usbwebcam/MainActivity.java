@@ -80,6 +80,10 @@ public final class MainActivity extends AppCompatActivity {
     private TextView wifiWarningView;
     private TextView wifiUrlView;
     private Button wifiCopyButton;
+    private Button pairingButton;
+    private Button pairingApproveButton;
+    private Button pairingRejectButton;
+    private TextView pairingStatusView;
     private FrameLayout dimOverlay;
     private RadioGroup cameraGroup;
     private RadioGroup fpsGroup;
@@ -106,6 +110,9 @@ public final class MainActivity extends AppCompatActivity {
     private final ExecutorService analysisExecutor = Executors.newSingleThreadExecutor();
     private MjpegHttpServer mjpegServer;
     private MjpegHttpServer wifiServer;
+    private PairingHttpServer pairingServer;
+    private PairingGate pairingGate;
+    private String activePairCode;
     private ConnectivityManager connectivityManager;
     private ConnectivityManager.NetworkCallback wifiNetworkCallback;
     private Network wifiNetwork;
@@ -339,6 +346,34 @@ public final class MainActivity extends AppCompatActivity {
         wifiCopyButton.setVisibility(View.GONE);
         wifiCopyButton.setOnClickListener(view -> copyWifiObsUrl());
         root.addView(wifiCopyButton);
+
+        pairingButton = new Button(this);
+        pairingButton.setText(R.string.pair_with_pc);
+        pairingButton.setVisibility(View.GONE);
+        pairingButton.setOnClickListener(view -> beginPairing());
+        root.addView(pairingButton);
+        pairingStatusView = new TextView(this);
+        pairingStatusView.setVisibility(View.GONE);
+        root.addView(pairingStatusView);
+        pairingApproveButton = new Button(this);
+        pairingApproveButton.setText(R.string.approve_pc);
+        pairingApproveButton.setVisibility(View.GONE);
+        pairingApproveButton.setOnClickListener(view -> {
+            if (pairingGate != null && pairingGate.approve()) {
+                pairingStatusView.setText(R.string.pairing_approved);
+            }
+            pairingApproveButton.setVisibility(View.GONE);
+            pairingRejectButton.setVisibility(View.GONE);
+        });
+        root.addView(pairingApproveButton);
+        pairingRejectButton = new Button(this);
+        pairingRejectButton.setText(R.string.reject_pc);
+        pairingRejectButton.setVisibility(View.GONE);
+        pairingRejectButton.setOnClickListener(view -> {
+            if (pairingGate != null) pairingGate.revoke();
+            clearPairingUi();
+        });
+        root.addView(pairingRejectButton);
 
         TextView help = new TextView(this);
         help.setText(R.string.help);
@@ -709,6 +744,17 @@ public final class MainActivity extends AppCompatActivity {
                     wifiAuthenticator, bindAddress);
             server.start();
             wifiServer = server;
+            pairingGate = new PairingGate(System::currentTimeMillis);
+            PairingHttpServer candidate = new PairingHttpServer(bindAddress, pairingGate,
+                    () -> runOnUiThread(this::showPendingPairing));
+            try {
+                candidate.start();
+                pairingServer = candidate;
+                pairingButton.setVisibility(View.VISIBLE);
+            } catch (IOException pairingFailure) {
+                candidate.close();
+                pairingGate = null;
+            }
         } catch (IOException | SecurityException exception) {
             wifiAddress = null;
             wifiServer = null;
@@ -757,10 +803,59 @@ public final class MainActivity extends AppCompatActivity {
     }
 
     private void closeWifiServer() {
+        if (pairingServer != null) {
+            pairingServer.close();
+            pairingServer = null;
+        }
+        if (pairingGate != null) {
+            pairingGate.revoke();
+            pairingGate = null;
+        }
+        clearPairingUi();
         if (wifiServer != null) {
             wifiServer.close();
             wifiServer = null;
         }
+        wifiAuthenticator = null;
+    }
+
+    private void beginPairing() {
+        if (pairingServer == null || !pairingServer.isRunning() || pairingGate == null
+                || wifiAuthenticator == null || wifiAddress == null) return;
+        activePairCode = pairingGate.begin(wifiAuthenticator.tokenForSession());
+        pairingStatusView.setText(getString(R.string.pairing_invitation,
+                wifiAddress, PairingHttpServer.PORT, activePairCode));
+        pairingStatusView.setVisibility(View.VISIBLE);
+        pairingApproveButton.setVisibility(View.GONE);
+        pairingRejectButton.setVisibility(View.GONE);
+        String invitation = activePairCode;
+        pairingStatusView.postDelayed(() -> {
+            if (invitation.equals(activePairCode) && pairingGate != null) {
+                pairingGate.revoke();
+                clearPairingUi();
+            }
+        }, 120_000);
+    }
+
+    private void showPendingPairing() {
+        if (pairingGate == null || pairingGate.pendingClient() == null) return;
+        pairingStatusView.setText(getString(R.string.pairing_request,
+                pairingGate.pendingClient()));
+        pairingStatusView.setVisibility(View.VISIBLE);
+        pairingApproveButton.setVisibility(View.VISIBLE);
+        pairingRejectButton.setVisibility(View.VISIBLE);
+    }
+
+    private void clearPairingUi() {
+        activePairCode = null;
+        if (pairingButton != null) pairingButton.setVisibility(pairingServer != null
+                && pairingServer.isRunning() ? View.VISIBLE : View.GONE);
+        if (pairingStatusView != null) {
+            pairingStatusView.setText("");
+            pairingStatusView.setVisibility(View.GONE);
+        }
+        if (pairingApproveButton != null) pairingApproveButton.setVisibility(View.GONE);
+        if (pairingRejectButton != null) pairingRejectButton.setVisibility(View.GONE);
     }
 
     private void stopWifiListener(boolean clearOptIn) {
