@@ -91,3 +91,7 @@ The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`. Install
 | Virtual Camera is unavailable | Confirm the Browser source displays video, then use OBS **Start Virtual Camera** and select **OBS Virtual Camera** in the other app. |
 
 Remove the port forward after use with `adb forward --remove tcp:8765`. The project license is in [LICENSE](LICENSE).
+
+## Community
+
+Follow [menagreen on Twitch](https://www.twitch.tv/menagreen).
