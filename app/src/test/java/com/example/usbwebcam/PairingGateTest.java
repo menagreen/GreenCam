@@ -24,9 +24,11 @@ public class PairingGateTest {
         PairingGate gate = new PairingGate(now::get);
         String code = gate.begin("0123456789abcdef0123456789abcdef");
         for (int i = 0; i < 5; i++) assertFalse(gate.submit("wrong", "peer"));
+        assertFalse(gate.isInvitationActive());
         assertFalse(gate.submit(code, "peer"));
         code = gate.begin("0123456789abcdef0123456789abcdef");
         now.set(121001);
+        assertFalse(gate.isInvitationActive());
         assertFalse(gate.submit(code, "peer"));
         code = gate.begin("0123456789abcdef0123456789abcdef");
         assertTrue(gate.submit(code, "peer"));

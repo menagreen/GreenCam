@@ -746,7 +746,12 @@ public final class MainActivity extends AppCompatActivity {
             wifiServer = server;
             pairingGate = new PairingGate(System::currentTimeMillis);
             PairingHttpServer candidate = new PairingHttpServer(bindAddress, pairingGate,
-                    () -> runOnUiThread(this::showPendingPairing));
+                    () -> runOnUiThread(this::showPendingPairing),
+                    () -> runOnUiThread(() -> {
+                        if (pairingGate != null && !pairingGate.isInvitationActive()) {
+                            clearPairingUi();
+                        }
+                    }));
             try {
                 candidate.start();
                 pairingServer = candidate;

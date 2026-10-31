@@ -9,9 +9,27 @@ import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.Test;
 
 public class PairingHttpServerTest {
+    @Test public void exhaustingAttemptsNotifiesPhoneToClearInvitation() throws Exception {
+        PairingGate gate = new PairingGate(System::currentTimeMillis);
+        String code = gate.begin("0123456789abcdef0123456789abcdef");
+        String invalidCode = code.equals("000000") ? "000001" : "000000";
+        AtomicInteger revoked = new AtomicInteger();
+        try (PairingHttpServer server = new PairingHttpServer(
+                InetAddress.getByName("127.0.0.1"), 0, gate, () -> { },
+                revoked::incrementAndGet)) {
+            server.start();
+            for (int i = 0; i < 5; i++) {
+                assertEquals(403, request(server.getLocalPort(), invalidCode).getResponseCode());
+            }
+            assertFalse(gate.isInvitationActive());
+            assertEquals(1, revoked.get());
+        }
+    }
+
     @Test public void returnsTokenOnlyAfterPhoneApproval() throws Exception {
         PairingGate gate = new PairingGate(System::currentTimeMillis);
         String code = gate.begin("0123456789abcdef0123456789abcdef");

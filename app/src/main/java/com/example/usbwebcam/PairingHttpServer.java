@@ -18,18 +18,30 @@ final class PairingHttpServer implements AutoCloseable {
     private final int port;
     private final PairingGate gate;
     private final Runnable onPending;
+    private final Runnable onRevoked;
     private ServerSocket server;
     private Thread thread;
 
     PairingHttpServer(InetAddress address, PairingGate gate, Runnable onPending) {
-        this(address, PORT, gate, onPending);
+        this(address, PORT, gate, onPending, () -> { });
     }
 
     PairingHttpServer(InetAddress address, int port, PairingGate gate, Runnable onPending) {
+        this(address, port, gate, onPending, () -> { });
+    }
+
+    PairingHttpServer(InetAddress address, PairingGate gate, Runnable onPending,
+                      Runnable onRevoked) {
+        this(address, PORT, gate, onPending, onRevoked);
+    }
+
+    PairingHttpServer(InetAddress address, int port, PairingGate gate, Runnable onPending,
+                      Runnable onRevoked) {
         this.address = address;
         this.port = port;
         this.gate = gate;
         this.onPending = onPending;
+        this.onRevoked = onRevoked;
     }
 
     synchronized void start() throws IOException {
@@ -101,6 +113,7 @@ final class PairingHttpServer implements AutoCloseable {
         String code = requestLine.substring(prefix.length(), requestLine.length() - suffix.length());
         if (!code.matches("[0-9]{6}") || !gate.submit(code,
                 client.getInetAddress().getHostAddress())) {
+            if (!gate.isInvitationActive()) onRevoked.run();
             reply(client, 403, "Forbidden", "");
             return;
         }

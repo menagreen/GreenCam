@@ -51,6 +51,10 @@ final class PairingGate {
         return pendingClient;
     }
 
+    synchronized boolean isInvitationActive() {
+        return code != null && clock.now() < expiresAt;
+    }
+
     synchronized boolean approve() {
         if (pendingClient == null || code == null || clock.now() >= expiresAt) return false;
         approved = true;
