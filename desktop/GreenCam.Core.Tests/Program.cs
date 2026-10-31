@@ -1,5 +1,10 @@
 using GreenCam.Core;
 
+if (!AboutText.Message.Contains("menagreen", StringComparison.Ordinal)
+    || !AboutText.Message.Contains("content creators", StringComparison.OrdinalIgnoreCase)
+    || !AboutText.Message.Contains("phone camera", StringComparison.OrdinalIgnoreCase))
+    throw new Exception("About message is incomplete");
+
 static void Equal<T>(T expected, T actual)
 {
     if (!EqualityComparer<T>.Default.Equals(expected, actual))

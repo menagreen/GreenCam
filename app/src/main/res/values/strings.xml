@@ -1,5 +1,7 @@
 <resources>
     <string name="app_name">GreenCam</string>
+    <string name="about_title">About</string>
+    <string name="about_message">GreenCam was created by menagreen for content creators who cannot afford a webcam or want to make the most of their phone camera.</string>
     <string name="subtitle">Your USB camera for OBS</string>
     <string name="camera">Camera</string>
     <string name="camera_selection">Camera selection</string>
