@@ -371,9 +371,20 @@ public final class MainActivity extends AppCompatActivity {
         RadioButton button = new RadioButton(this);
         button.setId(View.generateViewId());
         button.setText(label);
-        group.addView(button, new RadioGroup.LayoutParams(0,
-                RadioGroup.LayoutParams.WRAP_CONTENT, 1));
+        boolean vertical = group.getOrientation() == RadioGroup.VERTICAL;
+        group.addView(button, new RadioGroup.LayoutParams(
+                CameraOptionLayoutPolicy.width(vertical),
+                RadioGroup.LayoutParams.WRAP_CONTENT,
+                CameraOptionLayoutPolicy.weight(vertical)));
         return button;
+    }
+
+    private void updateCameraOptionLayout(RadioButton button) {
+        boolean vertical = cameraGroup.getOrientation() == RadioGroup.VERTICAL;
+        button.setLayoutParams(new RadioGroup.LayoutParams(
+                CameraOptionLayoutPolicy.width(vertical),
+                RadioGroup.LayoutParams.WRAP_CONTENT,
+                CameraOptionLayoutPolicy.weight(vertical)));
     }
 
     private RadioButton fpsOption(int fps) {
@@ -422,6 +433,8 @@ public final class MainActivity extends AppCompatActivity {
             return;
         }
         cameraGroup.setOrientation(ids.size() > 1 ? RadioGroup.VERTICAL : RadioGroup.HORIZONTAL);
+        updateCameraOptionLayout(backButton);
+        updateCameraOptionLayout(frontButton);
         rearButtons.put(ids.get(0), backButton);
         for (int index = 1; index < ids.size(); index++) {
             String id = ids.get(index);
