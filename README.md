@@ -36,6 +36,19 @@ While the camera is running, tap **Enable Wi-Fi OBS stream**. When the stream is
 
 The URL includes a fresh per-run bearer token that protects access to the page and stream from casual unauthenticated requests. Copying it temporarily places that secret on the Android clipboard, where other software may access it. HTTP is plaintext: the token and video are not encrypted, and anyone who obtains the URL on the network can use it. Do not use this on public or untrusted Wi-Fi. Stopping the camera closes the Wi-Fi listener and invalidates the URL.
 
+### Portable Windows companion (preview)
+
+The desktop companion can be published as a single self-contained Windows x64 executable; the receiving PC does not need a separate .NET installation. On the phone, start the camera, enable the Wi-Fi stream, and tap **Pair with PC**. In the desktop app, enter the phone IP and six-digit code, tap **Pair**, then approve the request on the phone. The app previews MJPEG without showing or saving the bearer URL. **Disconnect** stops the preview. Use only trusted Wi-Fi because pairing and video are not encrypted.
+
+To build the portable executable on a development PC with .NET 10 SDK:
+
+```powershell
+dotnet run --project desktop/GreenCam.Core.Tests/GreenCam.Core.Tests.csproj
+dotnet publish desktop/GreenCam.Desktop/GreenCam.Desktop.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o desktop-publish
+```
+
+Copy only `desktop-publish/GreenCam.Desktop.exe` to the receiving PC. Camera controls and filters are not yet in this preview.
+
 ### 3. Add the camera to OBS
 
 1. In OBS, add a **Browser** source to a scene.

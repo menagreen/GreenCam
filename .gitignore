@@ -1,5 +1,7 @@
 .gradle/
 **/build/
+**/bin/
+**/obj/
 .local-tools/
 .atl/
 .codegraph/
