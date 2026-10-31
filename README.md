@@ -50,6 +50,7 @@ See the [OBS Browser Source guide](https://obsproject.com/kb/browser-source) for
 
 - **Start camera / Stop camera** controls preview and streaming together.
 - **Enable Wi-Fi OBS stream** is an optional second listener for a trusted local Wi-Fi network; its URL is hidden when disabled, unavailable, or when the camera stops. The URL contains a bearer token, but HTTP is not encrypted and does not provide confidentiality.
+- **Pair with PC** (while the Wi-Fi stream runs) shows a six-digit, two-minute invitation and the phone's local IP/port. A connecting PC must submit the code to `POST /pair?code=<six digits>` on port 8766, then wait for explicit approval on the phone. Five incorrect codes close the invitation; approval returns the current MJPEG token once in a `no-store` JSON response. Stop the camera or Wi-Fi to revoke the invitation. This is intended for a trusted LAN only: pairing and MJPEG use plaintext HTTP, so network observers may intercept credentials. The portable desktop client is still being built.
 - **Dim screen (camera stays on)** covers the controls with a black screen and sets window brightness to minimum without stopping the camera or USB stream. Tap anywhere, including **Tap to restore**, to exit; the previous brightness is restored when exiting or leaving the app. This does not turn off the physical display.
 - **Rear camera / Front camera** shows the active choice; when CameraX exposes multiple independent rear camera IDs, they appear as **Rear camera 1**, **Rear camera 2**, and so on. You can switch while running. Numbering identifies exposed cameras, not a guaranteed wide/telephoto lens order. A phone may hide physical sensors behind one logical camera, so GreenCam cannot promise access to every rear lens.
 - **Zoom** uses the active camera's advertised range; the slider is disabled when that camera has no usable zoom range. Switching cameras resets zoom to 1× where supported. Tap the live preview to request focus at that point; focus behavior depends on camera hardware.
@@ -90,3 +91,7 @@ The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`. Install
 | Virtual Camera is unavailable | Confirm the Browser source displays video, then use OBS **Start Virtual Camera** and select **OBS Virtual Camera** in the other app. |
 
 Remove the port forward after use with `adb forward --remove tcp:8765`. The project license is in [LICENSE](LICENSE).
+
+## Community
+
+Follow [menagreen on Twitch](https://www.twitch.tv/menagreen).

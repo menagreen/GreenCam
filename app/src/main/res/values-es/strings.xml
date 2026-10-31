@@ -46,4 +46,10 @@
     <string name="zoom_unavailable">El zoom no está disponible en esta cámara</string>
     <string name="zoom_control_description">Nivel de zoom de la cámara</string>
     <string name="preview_focus_description">Vista previa de la cámara. Toca para enfocar.</string>
+    <string name="pair_with_pc">Vincular con PC</string>
+    <string name="approve_pc">Aprobar esta PC</string>
+    <string name="reject_pc">Rechazar</string>
+    <string name="pairing_invitation">En la PC, conéctate a %1$s:%2$d con el código %3$s. Caduca en 2 minutos. Usa solo una red Wi-Fi de confianza.</string>
+    <string name="pairing_request">Solicitud de vinculación desde %1$s. Aprueba solo si es tu PC.</string>
+    <string name="pairing_approved">PC aprobada. Mantén GreenCam en ejecución.</string>
 </resources>
