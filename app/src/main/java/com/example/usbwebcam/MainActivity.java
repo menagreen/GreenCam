@@ -59,6 +59,8 @@ import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -83,6 +85,8 @@ public final class MainActivity extends AppCompatActivity {
     private RadioGroup fpsGroup;
     private RadioButton backButton;
     private RadioButton frontButton;
+    private final Map<String, RadioButton> rearButtons = new LinkedHashMap<>();
+    private String selectedRearCameraId;
     private RadioButton fps10Button;
     private RadioButton fps15Button;
     private RadioButton fps30Button;
@@ -250,8 +254,23 @@ public final class MainActivity extends AppCompatActivity {
         frontButton = cameraOption(getString(R.string.front_camera), cameraGroup);
         cameraGroup.setOnCheckedChangeListener((group, checkedId) -> {
             if (!syncingControls) {
-                selectCamera(checkedId == frontButton.getId()
-                        ? CameraSelectionPolicy.LENS_FRONT : CameraSelectionPolicy.LENS_BACK);
+                if (checkedId == frontButton.getId()) {
+                    selectCamera(CameraSelectionPolicy.LENS_FRONT);
+                } else {
+                    String previousRearId = selectedRearCameraId;
+                    int previousLens = lensFacing;
+                    for (Map.Entry<String, RadioButton> entry : rearButtons.entrySet()) {
+                        if (entry.getValue().getId() == checkedId) {
+                            selectedRearCameraId = entry.getKey();
+                            break;
+                        }
+                    }
+                    selectCamera(CameraSelectionPolicy.LENS_BACK);
+                    if (started && previousLens == CameraSelectionPolicy.LENS_BACK
+                            && !selectedRearCameraId.equals(previousRearId)) {
+                        startPreview();
+                    }
+                }
             }
         });
         root.addView(cameraGroup);
@@ -373,6 +392,7 @@ public final class MainActivity extends AppCompatActivity {
         future.addListener(() -> {
             try {
                 cameraProvider = future.get();
+                populateRearCameras();
                 chooseAvailableDefaultCamera();
                 updateControls();
                 attemptStartPreview();
@@ -391,6 +411,38 @@ public final class MainActivity extends AppCompatActivity {
         lensFacing = CameraSelectionPolicy.defaultLens(
                 hasCamera(CameraSelectionPolicy.LENS_BACK),
                 hasCamera(CameraSelectionPolicy.LENS_FRONT));
+    }
+
+    @OptIn(markerClass = ExperimentalCamera2Interop.class)
+    private void populateRearCameras() {
+        rearButtons.clear();
+        List<String> ids = availableRearIds();
+        selectedRearCameraId = CameraSelectionPolicy.selectRearId(selectedRearCameraId, null, ids);
+        if (ids.isEmpty()) {
+            return;
+        }
+        cameraGroup.setOrientation(ids.size() > 1 ? RadioGroup.VERTICAL : RadioGroup.HORIZONTAL);
+        rearButtons.put(ids.get(0), backButton);
+        for (int index = 1; index < ids.size(); index++) {
+            String id = ids.get(index);
+            RadioButton button = cameraOption(getString(R.string.rear_camera_numbered, index + 1), cameraGroup);
+            rearButtons.put(id, button);
+        }
+        backButton.setText(ids.size() == 1 ? getString(R.string.rear_camera)
+                : getString(R.string.rear_camera_numbered, 1));
+    }
+
+    @OptIn(markerClass = ExperimentalCamera2Interop.class)
+    private List<String> availableRearIds() {
+        List<String> ids = new ArrayList<>();
+        if (cameraProvider == null) {
+            return ids;
+        }
+        for (CameraInfo info : selectorFor(CameraSelectionPolicy.LENS_BACK)
+                .filter(cameraProvider.getAvailableCameraInfos())) {
+            ids.add(Camera2CameraInfo.from(info).getCameraId());
+        }
+        return ids;
     }
 
     private void onStartClicked() {
@@ -732,8 +784,22 @@ public final class MainActivity extends AppCompatActivity {
     }
 
     @NonNull
+    @OptIn(markerClass = ExperimentalCamera2Interop.class)
     private CameraSelector selectorFor(int facing) {
-        return new CameraSelector.Builder().requireLensFacing(facing).build();
+        CameraSelector.Builder builder = new CameraSelector.Builder().requireLensFacing(facing);
+        if (facing == CameraSelectionPolicy.LENS_BACK && selectedRearCameraId != null) {
+            String id = selectedRearCameraId;
+            builder.addCameraFilter(infos -> {
+                List<CameraInfo> matches = new ArrayList<>();
+                for (CameraInfo info : infos) {
+                    if (id.equals(Camera2CameraInfo.from(info).getCameraId())) {
+                        matches.add(info);
+                    }
+                }
+                return matches;
+            });
+        }
+        return builder.build();
     }
 
     @OptIn(markerClass = ExperimentalCamera2Interop.class)
@@ -764,8 +830,9 @@ public final class MainActivity extends AppCompatActivity {
         syncingControls = true;
         backButton.setEnabled(backAvailable);
         frontButton.setEnabled(frontAvailable);
+        RadioButton selectedRear = rearButtons.get(selectedRearCameraId);
         cameraGroup.check(lensFacing == CameraSelectionPolicy.LENS_FRONT
-                ? frontButton.getId() : backButton.getId());
+                ? frontButton.getId() : selectedRear == null ? backButton.getId() : selectedRear.getId());
         int advertisedMaximum = selectedCameraAdvertisedMaximum();
         int selectedFps = FpsCapabilityPolicy.reconcileSelection(
                 frameRateLimiter.getMaxFps(), advertisedMaximum);
@@ -779,9 +846,11 @@ public final class MainActivity extends AppCompatActivity {
                 : maxFps == 30 ? fps30Button.getId()
                 : maxFps == 60 ? fps60Button.getId() : fps15Button.getId());
         syncingControls = false;
-        selectionView.setText(getString(R.string.selection_summary,
-                getString(lensFacing == CameraSelectionPolicy.LENS_FRONT
-                        ? R.string.front_camera : R.string.rear_camera), maxFps));
+        String cameraLabel = lensFacing == CameraSelectionPolicy.LENS_FRONT
+                ? getString(R.string.front_camera)
+                : selectedRear == null ? getString(R.string.rear_camera)
+                : selectedRear.getText().toString();
+        selectionView.setText(getString(R.string.selection_summary, cameraLabel, maxFps));
         cameraCapabilityView.setText(advertisedMaximum == FpsCapabilityPolicy.UNKNOWN_MAX_FPS
                 ? getString(R.string.capability_unknown)
                 : getString(R.string.capability_known, advertisedMaximum));

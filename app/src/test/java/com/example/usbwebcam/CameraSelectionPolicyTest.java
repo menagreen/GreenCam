@@ -1,6 +1,9 @@
 package com.example.usbwebcam;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
+
+import java.util.Arrays;
 
 import org.junit.Test;
 
@@ -35,5 +38,13 @@ public class CameraSelectionPolicyTest {
                 CameraSelectionPolicy.defaultLens(false, true));
         assertEquals(CameraSelectionPolicy.LENS_BACK,
                 CameraSelectionPolicy.defaultLens(true, true));
+    }
+
+    @Test
+    public void rearIdSelectionRejectsIdsNoLongerExposed() {
+        assertEquals("2", CameraSelectionPolicy.selectRearId("0", "2", Arrays.asList("0", "2")));
+        assertEquals("0", CameraSelectionPolicy.selectRearId("0", "missing", Arrays.asList("0", "2")));
+        assertEquals("2", CameraSelectionPolicy.selectRearId("missing", "missing", Arrays.asList("2")));
+        assertNull(CameraSelectionPolicy.selectRearId(null, "missing", Arrays.asList()));
     }
 }

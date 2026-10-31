@@ -4,6 +4,7 @@
     <string name="camera">Camera</string>
     <string name="camera_selection">Camera selection</string>
     <string name="rear_camera">Rear camera</string>
+    <string name="rear_camera_numbered">Rear camera %1$d</string>
     <string name="front_camera">Front camera</string>
     <string name="output_rate">Output rate (up to)</string>
     <string name="output_frame_rate_limit">Output frame rate limit</string>
