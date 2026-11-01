@@ -56,7 +56,7 @@
     <string name="pairing_approved">PC aprobada. Mantén GreenCam en ejecución.</string>
     <string name="enable_usb_tether">Activar transmisión por USB compartido</string>
     <string name="disable_usb_tether">Desactivar transmisión por USB compartido</string>
-    <string name="usb_tether_waiting">Conecta un cable USB de datos y activa Compartir Internet por USB en los ajustes de Android. No necesitas ADB.</string>
+    <string name="usb_tether_waiting">Conecta un cable USB de datos y activa Compartir Internet por USB en los ajustes de Android. Si sales de GreenCam, vuelve a iniciar la cámara y esta transmisión al regresar. No necesitas ADB.</string>
     <string name="usb_tether_ready">Transmisión por USB lista en %1$s. Vincula la app de Windows.</string>
     <string name="usb_tether_failed">Se encontró la interfaz USB, pero GreenCam no pudo iniciar la transmisión protegida. Comprueba si otra app usa los puertos 8765 o 8766.</string>
     <string name="usb_pair_with_pc">Vincular PC por USB</string>

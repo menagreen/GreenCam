@@ -56,7 +56,7 @@
     <string name="pairing_approved">PC approved. Keep GreenCam running.</string>
     <string name="enable_usb_tether">Enable USB tether stream</string>
     <string name="disable_usb_tether">Disable USB tether stream</string>
-    <string name="usb_tether_waiting">Connect a USB data cable and enable USB tethering in Android settings. No ADB is needed.</string>
+    <string name="usb_tether_waiting">Connect a USB data cable and enable USB tethering in Android settings. If you leave GreenCam, restart the camera and this stream when you return. No ADB is needed.</string>
     <string name="usb_tether_ready">USB tether stream ready at %1$s. Pair from the Windows app.</string>
     <string name="usb_tether_failed">USB tether interface found, but GreenCam could not start the protected stream. Check whether another app uses ports 8765 or 8766.</string>
     <string name="usb_pair_with_pc">Pair PC over USB</string>
