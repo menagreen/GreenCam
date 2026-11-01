@@ -12,6 +12,8 @@ import android.net.Network;
 import android.net.NetworkRequest;
 import android.hardware.camera2.CameraCharacteristics;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.util.Size;
@@ -58,7 +60,10 @@ import com.google.common.util.concurrent.ListenableFuture;
 import java.io.IOException;
 import java.net.Inet4Address;
 import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.SocketException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -85,6 +90,12 @@ public final class MainActivity extends AppCompatActivity {
     private Button pairingApproveButton;
     private Button pairingRejectButton;
     private TextView pairingStatusView;
+    private Button wiredButton;
+    private TextView wiredInfoView;
+    private Button wiredPairingButton;
+    private TextView wiredPairingStatusView;
+    private Button wiredApproveButton;
+    private Button wiredRejectButton;
     private FrameLayout dimOverlay;
     private RadioGroup cameraGroup;
     private RadioGroup fpsGroup;
@@ -120,6 +131,21 @@ public final class MainActivity extends AppCompatActivity {
     private String wifiAddress;
     private MjpegRequestAuthenticator wifiAuthenticator;
     private boolean wifiEnabled;
+    private boolean wiredEnabled;
+    private String wiredAddress;
+    private MjpegHttpServer wiredServer;
+    private MjpegRequestAuthenticator wiredAuthenticator;
+    private PairingHttpServer wiredPairingServer;
+    private PairingGate wiredPairingGate;
+    private String wiredPairCode;
+    private final Handler wiredHandler = new Handler(Looper.getMainLooper());
+    private final Runnable wiredPoll = new Runnable() {
+        @Override public void run() {
+            if (!wiredEnabled || !started) return;
+            refreshWiredAddress();
+            wiredHandler.postDelayed(this, 2000);
+        }
+    };
     private long frameSessionId;
     private final FrameRateLimiter frameRateLimiter = new FrameRateLimiter();
 
@@ -157,6 +183,7 @@ public final class MainActivity extends AppCompatActivity {
     protected void onDestroy() {
         exitDimScreenMode();
         stopWifiListener(true);
+        stopWiredListener(true);
         analysisExecutor.shutdownNow();
         super.onDestroy();
     }
@@ -389,6 +416,42 @@ public final class MainActivity extends AppCompatActivity {
         });
         root.addView(pairingRejectButton);
 
+        wiredButton = new Button(this);
+        wiredButton.setText(R.string.enable_usb_tether);
+        wiredButton.setEnabled(false);
+        wiredButton.setOnClickListener(view -> setWiredEnabled(!wiredEnabled));
+        root.addView(wiredButton);
+        wiredInfoView = new TextView(this);
+        wiredInfoView.setVisibility(View.GONE);
+        root.addView(wiredInfoView);
+        wiredPairingButton = new Button(this);
+        wiredPairingButton.setText(R.string.usb_pair_with_pc);
+        wiredPairingButton.setVisibility(View.GONE);
+        wiredPairingButton.setOnClickListener(view -> beginWiredPairing());
+        root.addView(wiredPairingButton);
+        wiredPairingStatusView = new TextView(this);
+        wiredPairingStatusView.setVisibility(View.GONE);
+        root.addView(wiredPairingStatusView);
+        wiredApproveButton = new Button(this);
+        wiredApproveButton.setText(R.string.approve_pc);
+        wiredApproveButton.setVisibility(View.GONE);
+        wiredApproveButton.setOnClickListener(view -> {
+            if (wiredPairingGate != null && wiredPairingGate.approve()) {
+                wiredPairingStatusView.setText(R.string.pairing_approved);
+            }
+            wiredApproveButton.setVisibility(View.GONE);
+            wiredRejectButton.setVisibility(View.GONE);
+        });
+        root.addView(wiredApproveButton);
+        wiredRejectButton = new Button(this);
+        wiredRejectButton.setText(R.string.reject_pc);
+        wiredRejectButton.setVisibility(View.GONE);
+        wiredRejectButton.setOnClickListener(view -> {
+            if (wiredPairingGate != null) wiredPairingGate.revoke();
+            clearWiredPairingUi();
+        });
+        root.addView(wiredRejectButton);
+
         TextView help = new TextView(this);
         help.setText(R.string.help);
         help.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
@@ -585,9 +648,11 @@ public final class MainActivity extends AppCompatActivity {
             if (wifiEnabled) {
                 registerWifiNetworkCallback();
             }
+            if (wiredEnabled) startWiredPolling();
             updateControls();
         } catch (IllegalArgumentException | IllegalStateException exception) {
             started = false;
+            stopWiredListener(true);
             boundCamera = null;
             boundCameraInfo = null;
             zoomMinimum = 1f;
@@ -621,6 +686,7 @@ public final class MainActivity extends AppCompatActivity {
     private void stopPreview() {
         exitDimScreenMode();
         stopWifiListener(true);
+        stopWiredListener(true);
         previewStartGate.cancel();
         started = false;
         jpegFrames.endSession(frameSessionId);
@@ -877,6 +943,163 @@ public final class MainActivity extends AppCompatActivity {
         if (pairingRejectButton != null) pairingRejectButton.setVisibility(View.GONE);
     }
 
+    private void setWiredEnabled(boolean enabled) {
+        if (!started) return;
+        wiredEnabled = enabled;
+        if (enabled) {
+            startWiredPolling();
+        } else {
+            stopWiredListener(false);
+        }
+        updateControls();
+    }
+
+    private void startWiredPolling() {
+        wiredHandler.removeCallbacks(wiredPoll);
+        wiredPoll.run();
+    }
+
+    private List<UsbTetherPolicy.Candidate> usbInterfaceAddresses() {
+        List<UsbTetherPolicy.Candidate> candidates = new ArrayList<>();
+        try {
+            java.util.Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+            if (interfaces == null) return candidates;
+            for (NetworkInterface networkInterface : Collections.list(interfaces)) {
+                if (!networkInterface.isUp() || networkInterface.isLoopback()) continue;
+                for (InetAddress address : Collections.list(networkInterface.getInetAddresses())) {
+                    if (address instanceof Inet4Address) {
+                        candidates.add(new UsbTetherPolicy.Candidate(networkInterface.getName(),
+                                address.getHostAddress()));
+                    }
+                }
+            }
+        } catch (SocketException | SecurityException ignored) {
+            // An unavailable interface is treated as disconnected; the next poll can recover.
+        }
+        return candidates;
+    }
+
+    private void refreshWiredAddress() {
+        String selected = UsbTetherPolicy.chooseAddress(usbInterfaceAddresses());
+        if (!UsbTetherPolicy.shouldListen(started, wiredEnabled, selected)) {
+            wiredAddress = null;
+            closeWiredServer();
+            wiredInfoView.setText(R.string.usb_tether_waiting);
+            wiredInfoView.setVisibility(View.VISIBLE);
+            return;
+        }
+        if (UsbTetherPolicy.needsRestart(wiredAddress, selected,
+                wiredServer != null && wiredServer.isRunning(),
+                wiredPairingServer != null && wiredPairingServer.isRunning())) {
+            wiredAddress = selected;
+            startWiredServer(selected);
+        }
+        if (wiredServer != null && wiredPairingServer != null) {
+            wiredInfoView.setText(getString(R.string.usb_tether_ready, selected));
+            wiredPairingButton.setVisibility(View.VISIBLE);
+        } else {
+            wiredInfoView.setText(R.string.usb_tether_failed);
+        }
+        wiredInfoView.setVisibility(View.VISIBLE);
+    }
+
+    private void startWiredServer(String address) {
+        closeWiredServer();
+        if (!UsbTetherPolicy.shouldListen(started, wiredEnabled, address)) return;
+        MjpegHttpServer stream = null;
+        PairingHttpServer pairing = null;
+        try {
+            InetAddress bindAddress = InetAddress.getByName(address);
+            MjpegRequestAuthenticator authenticator = MjpegRequestAuthenticator.create();
+            stream = new MjpegHttpServer(jpegFrames, MjpegHttpServer.PORT,
+                    authenticator, bindAddress);
+            stream.start();
+            PairingGate gate = new PairingGate(System::currentTimeMillis);
+            pairing = new PairingHttpServer(bindAddress, gate,
+                    () -> runOnUiThread(() -> showPendingWiredPairing(gate)),
+                    () -> runOnUiThread(() -> {
+                        if (wiredPairingGate == gate && !gate.isInvitationActive()) {
+                            clearWiredPairingUi();
+                        }
+                    }));
+            pairing.start();
+            wiredServer = stream;
+            wiredAuthenticator = authenticator;
+            wiredPairingGate = gate;
+            wiredPairingServer = pairing;
+        } catch (IOException | SecurityException exception) {
+            if (pairing != null) pairing.close();
+            if (stream != null) stream.close();
+            wiredAddress = null;
+        }
+    }
+
+    private void beginWiredPairing() {
+        if (wiredPairingServer == null || !wiredPairingServer.isRunning()
+                || wiredPairingGate == null || wiredAuthenticator == null || wiredAddress == null) return;
+        PairingGate gate = wiredPairingGate;
+        wiredPairCode = gate.begin(wiredAuthenticator.tokenForSession());
+        wiredPairingStatusView.setText(getString(R.string.usb_pairing_invitation,
+                wiredAddress, PairingHttpServer.PORT, wiredPairCode));
+        wiredPairingStatusView.setVisibility(View.VISIBLE);
+        wiredApproveButton.setVisibility(View.GONE);
+        wiredRejectButton.setVisibility(View.GONE);
+        String invitation = wiredPairCode;
+        wiredPairingStatusView.postDelayed(() -> {
+            if (gate == wiredPairingGate && invitation.equals(wiredPairCode)) {
+                gate.revoke();
+                clearWiredPairingUi();
+            }
+        }, 120_000);
+    }
+
+    private void showPendingWiredPairing(PairingGate gate) {
+        if (gate != wiredPairingGate || gate.pendingClient() == null) return;
+        wiredPairingStatusView.setText(getString(R.string.pairing_request,
+                gate.pendingClient()));
+        wiredPairingStatusView.setVisibility(View.VISIBLE);
+        wiredApproveButton.setVisibility(View.VISIBLE);
+        wiredRejectButton.setVisibility(View.VISIBLE);
+    }
+
+    private void clearWiredPairingUi() {
+        wiredPairCode = null;
+        if (wiredPairingButton != null) wiredPairingButton.setVisibility(wiredPairingServer != null
+                && wiredPairingServer.isRunning() ? View.VISIBLE : View.GONE);
+        if (wiredPairingStatusView != null) {
+            wiredPairingStatusView.setText("");
+            wiredPairingStatusView.setVisibility(View.GONE);
+        }
+        if (wiredApproveButton != null) wiredApproveButton.setVisibility(View.GONE);
+        if (wiredRejectButton != null) wiredRejectButton.setVisibility(View.GONE);
+    }
+
+    private void closeWiredServer() {
+        if (wiredPairingServer != null) {
+            wiredPairingServer.close();
+            wiredPairingServer = null;
+        }
+        if (wiredPairingGate != null) {
+            wiredPairingGate.revoke();
+            wiredPairingGate = null;
+        }
+        clearWiredPairingUi();
+        if (wiredServer != null) {
+            wiredServer.close();
+            wiredServer = null;
+        }
+        wiredAuthenticator = null;
+    }
+
+    private void stopWiredListener(boolean clearOptIn) {
+        wiredHandler.removeCallbacks(wiredPoll);
+        closeWiredServer();
+        wiredAddress = null;
+        if (clearOptIn) wiredEnabled = false;
+        if (wiredInfoView != null) wiredInfoView.setVisibility(wiredEnabled
+                ? View.VISIBLE : View.GONE);
+    }
+
     private void stopWifiListener(boolean clearOptIn) {
         closeWifiServer();
         if (connectivityManager != null && wifiNetworkCallback != null) {
@@ -954,6 +1177,9 @@ public final class MainActivity extends AppCompatActivity {
         wifiButton.setEnabled(started);
         wifiButton.setText(wifiEnabled ? R.string.disable_wifi : R.string.enable_wifi);
         wifiWarningView.setVisibility(wifiEnabled ? View.VISIBLE : View.GONE);
+        wiredButton.setEnabled(started);
+        wiredButton.setText(wiredEnabled ? R.string.disable_usb_tether : R.string.enable_usb_tether);
+        wiredInfoView.setVisibility(wiredEnabled ? View.VISIBLE : View.GONE);
         syncingControls = true;
         backButton.setEnabled(backAvailable);
         frontButton.setEnabled(frontAvailable);

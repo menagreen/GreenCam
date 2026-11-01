@@ -1,12 +1,12 @@
 # GreenCam
 
-GreenCam turns an Android phone into a video-only webcam for OBS Studio over USB, with optional Wi-Fi streaming on a trusted local network. The USB listener is device-loopback-only and ADB forwards it to an OBS Browser Source on Windows. It does not use DroidCam, vendor-specific APIs, audio capture, or a background camera service.
+GreenCam turns an Android phone into a video-only camera for OBS Studio, with USB cable and Wi-Fi transport options. USB tethering can connect the portable Windows preview without ADB; the older device-loopback listener can still be forwarded with ADB for OBS. It does not use DroidCam, vendor-specific APIs, audio capture, or a background camera service.
 
 ## Requirements
 
 - Android 5.0 (API 21) or newer with a working CameraX-compatible camera.
-- A Windows PC with Android Platform Tools (ADB), OBS Studio, and a USB data cable.
-- USB debugging enabled and authorized for that PC while forwarding is in use.
+- A Windows PC and a USB data cable for wired use, or a trusted local Wi-Fi network.
+- Android Platform Tools (ADB) and USB debugging **only** for the older ADB-forwarded OBS route; they are not needed for USB tethering or Wi-Fi pairing.
 
 ## Quick setup
 
@@ -14,7 +14,13 @@ GreenCam turns an Android phone into a video-only webcam for OBS Studio over USB
 
 Download the [v0.1.0-alpha.9 preview APK](https://github.com/menagreen/GreenCam/releases/download/v0.1.0-alpha.9/GreenCam-v0.1.0-alpha.9-debug.apk) or build the debug APK from source below, then install it on the phone. This preview is debug-signed, not a production-signed release; a future build with a different signing key may require uninstalling it first. Open **GreenCam**, choose the available **Rear camera** or **Front camera**, select an output limit of **10**, **15**, **30**, or **60 FPS**, then tap **Start camera** and grant camera permission when Android asks. Keep GreenCam in the foreground; leaving the app stops the camera and stream.
 
-### 2. Forward the stream over USB
+### 2. Use USB tethering without ADB (portable Windows preview)
+
+Connect the phone to the PC with a USB data cable. Start GreenCam's camera and tap **Enable USB tether stream**. In Android system settings, enable **USB tethering** (sometimes called **Share Internet via USB**). GreenCam cannot enable this system setting itself. When it detects the tether interface, it shows the phone's wired IP address; tap **Pair PC over USB**. In the portable Windows app, enter that IP and the six-digit code, tap **Pair**, and approve the request on the phone. No `adb forward` or USB debugging is needed for this route. Tether interface availability and the Windows USB network adapter depend on the device and driver; if the phone never shows an address, check that USB tethering is active. This is a network connection over the cable, **not** a native UVC webcam. Keep GreenCam foregrounded.
+
+The wired preview is authenticated, but it still uses plaintext HTTP over the USB network. The desktop **Copy OBS URL** handoff is planned separately; this preview does not yet offer simultaneous desktop preview and OBS over the same tether listener.
+
+### Alternative: forward the stream over USB with ADB
 
 Connect and unlock the phone, approve the USB debugging prompt, and confirm ADB sees it:
 
@@ -64,6 +70,7 @@ See the [OBS Browser Source guide](https://obsproject.com/kb/browser-source) for
 - **Start camera / Stop camera** controls preview and streaming together.
 - **Enable Wi-Fi OBS stream** is an optional second listener for a trusted local Wi-Fi network; its URL is hidden when disabled, unavailable, or when the camera stops. The URL contains a bearer token, but HTTP is not encrypted and does not provide confidentiality.
 - **Pair with PC** (while the Wi-Fi stream runs) shows a six-digit, two-minute invitation and the phone's local IP/port. A connecting PC must submit the code to `POST /pair?code=<six digits>` on port 8766, then wait for explicit approval on the phone. Five incorrect codes close the invitation; approval returns the current MJPEG token once in a `no-store` JSON response. Stop the camera or Wi-Fi to revoke the invitation. This is intended for a trusted LAN only: pairing and MJPEG use plaintext HTTP, so network observers may intercept credentials. The portable desktop preview supports pairing and video; remote camera controls and filters remain future work.
+- **Enable USB tether stream / Pair PC over USB** uses an Android USB-tether network interface only after you opt in. It binds protected video and pairing sockets to that interface's private IPv4 address, not to every network interface; changing or losing the address closes both listeners and invalidates the invitation and token. USB tethering must be enabled in Android settings. The PC app uses the same IP/code/approval flow as Wi-Fi.
 - **Dim screen (camera stays on)** covers the controls with a black screen and sets window brightness to minimum without stopping the camera or USB stream. Tap anywhere, including **Tap to restore**, to exit; the previous brightness is restored when exiting or leaving the app. This does not turn off the physical display.
 - **Rear camera / Front camera** shows the active choice; when CameraX exposes multiple independent rear camera IDs, they appear as **Rear camera 1**, **Rear camera 2**, and so on. You can switch while running. Numbering identifies exposed cameras, not a guaranteed wide/telephoto lens order. A phone may hide physical sensors behind one logical camera, so GreenCam cannot promise access to every rear lens.
 - **Zoom** uses the active camera's advertised range; the slider is disabled when that camera has no usable zoom range. Switching cameras resets zoom to 1× where supported. Tap the live preview to request focus at that point; focus behavior depends on camera hardware.
