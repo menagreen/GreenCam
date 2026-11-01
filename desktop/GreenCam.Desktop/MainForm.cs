@@ -39,6 +39,10 @@ public sealed class MainForm : Form
         top.Controls.Add(new Label { Text = "Pairing code", AutoSize = true, Margin = new Padding(16, 7, 5, 0) });
         top.Controls.Add(pairingCode);
         top.Controls.Add(connect);
+        var about = new Button { Text = "About", Width = 90 };
+        about.Click += (_, _) => MessageBox.Show(this, AboutText.Message, "About GreenCam",
+            MessageBoxButtons.OK, MessageBoxIcon.Information);
+        top.Controls.Add(about);
         form.Controls.Add(top, 0, 0);
         form.Controls.Add(preview, 0, 1);
 

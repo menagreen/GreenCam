@@ -107,4 +107,6 @@ Remove the port forward after use with `adb forward --remove tcp:8765`. The proj
 
 ## Community
 
+GreenCam was created by menagreen for content creators who cannot afford a webcam or want to use their phone camera. Both apps have an **About** button with this message.
+
 Follow [menagreen on Twitch](https://www.twitch.tv/menagreen).

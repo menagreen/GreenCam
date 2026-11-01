@@ -33,6 +33,7 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.OptIn;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.camera.core.CameraInfo;
@@ -172,7 +173,20 @@ public final class MainActivity extends AppCompatActivity {
         title.setText(R.string.app_name);
         title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 24);
         title.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        root.addView(title);
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.addView(title, new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+        Button aboutButton = new Button(this);
+        aboutButton.setText(R.string.about_title);
+        aboutButton.setOnClickListener(view -> new AlertDialog.Builder(this)
+                .setTitle(R.string.about_title)
+                .setMessage(R.string.about_message)
+                .setPositiveButton(android.R.string.ok, null)
+                .show());
+        header.addView(aboutButton);
+        root.addView(header);
 
         TextView subtitle = new TextView(this);
         subtitle.setText(R.string.subtitle);
