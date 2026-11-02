@@ -48,6 +48,8 @@ Download the [Windows x64 portable preview](https://github.com/menagreen/GreenCa
 
 After pairing, **Copy OBS URL** explicitly copies the authenticated page URL for an OBS Browser Source. OBS and the desktop preview can stream simultaneously (two stream clients per listener); a third stream receives HTTP 503. The URL contains a bearer secret that remains on the Windows clipboard until replaced, even after desktop disconnect. Do not share it. Stopping the phone camera or its transport invalidates the token.
 
+The desktop preview reads the stream separately from the UI and keeps only the newest pending frame, dropping older frames when rendering falls behind. This prevents a growing desktop render queue; actual end-to-end latency still depends on the phone encoder, network, and display and has not been measured for this preview.
+
 To build the portable executable on a development PC with .NET 10 SDK:
 
 ```powershell

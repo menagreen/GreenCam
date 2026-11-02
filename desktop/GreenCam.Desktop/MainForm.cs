@@ -114,15 +114,45 @@ public sealed class MainForm : Form
             status.Text = "Connected. Receiving video…";
             using var response = await client.OpenStreamAsync(session, cancellationToken);
             await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-            while (!cancellationToken.IsCancellationRequested)
+            using var mailbox = new LatestFrameMailbox();
+            using var renderTimer = new System.Windows.Forms.Timer { Interval = 33 };
+            renderTimer.Tick += (_, _) =>
             {
-                var frame = await MjpegFrameReader.ReadNextAsync(stream, cancellationToken);
-                using var imageBytes = new MemoryStream(frame);
-                using var decoded = Image.FromStream(imageBytes);
-                var next = new Bitmap(decoded);
-                var previous = preview.Image;
-                preview.Image = next;
-                previous?.Dispose();
+                var frame = mailbox.TakeLatest();
+                if (frame is null) return;
+                try
+                {
+                    using var imageBytes = new MemoryStream(frame);
+                    using var decoded = Image.FromStream(imageBytes);
+                    var next = new Bitmap(decoded);
+                    var previous = preview.Image;
+                    preview.Image = next;
+                    previous?.Dispose();
+                }
+                catch (ArgumentException)
+                {
+                    connection?.Cancel();
+                }
+                catch (OutOfMemoryException)
+                {
+                    connection?.Cancel();
+                }
+            };
+            renderTimer.Start();
+            try
+            {
+                await Task.Run(async () =>
+                {
+                    while (!cancellationToken.IsCancellationRequested)
+                    {
+                        var frame = await MjpegFrameReader.ReadNextAsync(stream, cancellationToken);
+                        if (!mailbox.Publish(frame)) break;
+                    }
+                }, cancellationToken);
+            }
+            finally
+            {
+                renderTimer.Stop();
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

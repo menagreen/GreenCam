@@ -45,6 +45,16 @@ Equal(false, lanHandler.UseProxy);
 Equal(false, lanHandler.AllowAutoRedirect);
 Equal("http://192.168.1.42:8765/?token=0123456789abcdef0123456789abcdef",
     ObsUrlPolicy.Create(session));
+using (var mailbox = new LatestFrameMailbox())
+{
+    for (var sequence = 0; sequence < 100; sequence++)
+        Equal(true, mailbox.Publish(new[] { (byte)sequence }));
+    Equal(99L, mailbox.DroppedFrames);
+    Equal((byte)99, mailbox.TakeLatest()![0]);
+    Equal<byte[]?>(null, mailbox.TakeLatest());
+    mailbox.Dispose();
+    Equal(false, mailbox.Publish(new byte[] { 100 }));
+}
 Console.WriteLine("All desktop core tests passed.");
 
 sealed class StubHandler : HttpMessageHandler
