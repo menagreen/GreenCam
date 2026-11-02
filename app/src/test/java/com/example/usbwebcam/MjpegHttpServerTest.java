@@ -51,25 +51,32 @@ public class MjpegHttpServerTest {
     }
 
     @Test
-    public void rejectsSecondStreamClientAndClosesActiveStreamOnStop() throws Exception {
+    public void allowsTwoStreamsRejectsThirdAndClosesBothOnStop() throws Exception {
         LatestJpegFrameStore frames = new LatestJpegFrameStore();
         frames.beginSession();
         MjpegHttpServer server = new MjpegHttpServer(frames, 0);
         server.start();
 
-        try (Socket first = connect(server.getLocalPort())) {
+        try (Socket first = connect(server.getLocalPort());
+             Socket second = connect(server.getLocalPort())) {
             first.getOutputStream().write("GET /stream.mjpg HTTP/1.1\r\n\r\n"
                     .getBytes(StandardCharsets.US_ASCII));
             first.getOutputStream().flush();
             String streamHeaders = readHeaders(first.getInputStream());
             assertTrue(streamHeaders.startsWith("HTTP/1.1 200 OK\r\n"));
 
-            String secondResponse = request(server.getLocalPort(),
+            second.getOutputStream().write("GET /stream.mjpg HTTP/1.1\r\n\r\n"
+                    .getBytes(StandardCharsets.US_ASCII));
+            second.getOutputStream().flush();
+            assertTrue(readHeaders(second.getInputStream()).startsWith("HTTP/1.1 200 OK\r\n"));
+
+            String thirdResponse = request(server.getLocalPort(),
                     "GET /stream.mjpg HTTP/1.1\r\n\r\n");
-            assertTrue(secondResponse.startsWith("HTTP/1.1 503 Service Unavailable\r\n"));
+            assertTrue(thirdResponse.startsWith("HTTP/1.1 503 Service Unavailable\r\n"));
 
             server.close();
             assertTrue(first.getInputStream().read() == -1);
+            assertTrue(second.getInputStream().read() == -1);
         } finally {
             server.close();
         }
@@ -98,11 +105,19 @@ public class MjpegHttpServerTest {
                     + authenticator.tokenForSession() + " HTTP/1.1\r\n\r\n");
             assertTrue(protectedIndex.startsWith("HTTP/1.1 200 OK\r\n"));
             assertTrue(protectedIndex.contains("src=\"" + streamPath + "\""));
-            try (Socket stream = connect(protectedServer.getLocalPort())) {
+            try (Socket stream = connect(protectedServer.getLocalPort());
+                 Socket obs = connect(protectedServer.getLocalPort())) {
                 stream.getOutputStream().write(("GET " + streamPath + " HTTP/1.1\r\n\r\n")
                         .getBytes(StandardCharsets.US_ASCII));
                 stream.getOutputStream().flush();
                 assertTrue(readHeaders(stream.getInputStream()).startsWith("HTTP/1.1 200 OK\r\n"));
+                obs.getOutputStream().write(("GET " + streamPath + " HTTP/1.1\r\n\r\n")
+                        .getBytes(StandardCharsets.US_ASCII));
+                obs.getOutputStream().flush();
+                assertTrue(readHeaders(obs.getInputStream()).startsWith("HTTP/1.1 200 OK\r\n"));
+                assertTrue(request(protectedServer.getLocalPort(),
+                        "GET " + streamPath + " HTTP/1.1\r\n\r\n")
+                        .startsWith("HTTP/1.1 503 Service Unavailable\r\n"));
             }
         } finally {
             protectedServer.close();

@@ -7,6 +7,7 @@ public sealed class MainForm : Form
     private readonly TextBox phoneAddress = new() { Width = 160, PlaceholderText = "192.168.1.42" };
     private readonly TextBox pairingCode = new() { Width = 90, MaxLength = 6, PlaceholderText = "123456" };
     private readonly Button connect = new() { Text = "Pair", Width = 95 };
+    private readonly Button copyObsUrl = new() { Text = "Copy OBS URL", Enabled = false, Width = 125 };
     private readonly PictureBox preview = new()
     {
         Dock = DockStyle.Fill,
@@ -15,6 +16,7 @@ public sealed class MainForm : Form
     };
     private readonly Label status = new() { Text = "Disconnected", AutoSize = true };
     private CancellationTokenSource? connection;
+    private PairingSession? activeSession;
 
     public MainForm()
     {
@@ -39,6 +41,7 @@ public sealed class MainForm : Form
         top.Controls.Add(new Label { Text = "Pairing code", AutoSize = true, Margin = new Padding(16, 7, 5, 0) });
         top.Controls.Add(pairingCode);
         top.Controls.Add(connect);
+        top.Controls.Add(copyObsUrl);
         var about = new Button { Text = "About", Width = 90 };
         about.Click += (_, _) => MessageBox.Show(this, AboutText.Message, "About GreenCam",
             MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -50,7 +53,7 @@ public sealed class MainForm : Form
         footer.Controls.Add(status);
         footer.Controls.Add(new Label
         {
-            Text = "Use only on trusted Wi-Fi. Video and pairing are not encrypted.",
+            Text = "Trusted Wi-Fi/USB only. HTTP is not encrypted; copied OBS URLs expose a bearer token on the clipboard.",
             AutoSize = true,
             Margin = new Padding(22, 0, 0, 0)
         });
@@ -61,6 +64,19 @@ public sealed class MainForm : Form
         {
             if (connection is not null) connection.Cancel();
             else _ = ConnectAsync();
+        };
+        copyObsUrl.Click += (_, _) =>
+        {
+            if (activeSession is null) return;
+            try
+            {
+                Clipboard.SetText(ObsUrlPolicy.Create(activeSession));
+                status.Text = "OBS URL copied. Paste it into OBS Browser Source; protect your clipboard.";
+            }
+            catch (Exception)
+            {
+                status.Text = "Could not copy the OBS URL. Try again.";
+            }
         };
         FormClosing += (_, _) => connection?.Cancel();
     }
@@ -92,6 +108,8 @@ public sealed class MainForm : Form
             using var client = new PairingClient(http);
             status.Text = "Waiting for approval on the phone…";
             var session = await client.PairAsync(phoneAddress.Text, pairingCode.Text, cancellationToken);
+            activeSession = session;
+            copyObsUrl.Enabled = true;
             pairingCode.Clear();
             status.Text = "Connected. Receiving video…";
             using var response = await client.OpenStreamAsync(session, cancellationToken);
@@ -118,6 +136,8 @@ public sealed class MainForm : Form
         }
         finally
         {
+            activeSession = null;
+            copyObsUrl.Enabled = false;
             connection.Dispose();
             connection = null;
             connect.Text = "Pair";

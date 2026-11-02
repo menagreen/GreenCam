@@ -18,7 +18,7 @@ Download the [v0.1.0-alpha.9 preview APK](https://github.com/menagreen/GreenCam/
 
 Connect the phone to the PC with a USB data cable. **First**, enable **USB tethering** (sometimes called **Share Internet via USB**) in Android system settings; GreenCam cannot enable this setting itself. Then return to GreenCam, start the camera, and tap **Enable USB tether stream**. If you leave GreenCam to change settings later, start the camera and re-enable this stream when you return: the app intentionally stops streaming in the background. When it detects the tether interface, it shows the phone's wired IP address; tap **Pair PC over USB**. In the portable Windows app, enter that IP and the six-digit code, tap **Pair**, and approve the request on the phone. No `adb forward` or USB debugging is needed for this route. Tether interface availability and the Windows USB network adapter depend on the device and driver; if the phone never shows an address, check that USB tethering is active. This is a network connection over the cable, **not** a native UVC webcam. Keep GreenCam foregrounded.
 
-The wired preview is authenticated, but it still uses plaintext HTTP over the USB network. The desktop **Copy OBS URL** handoff is planned separately; this preview does not yet offer simultaneous desktop preview and OBS over the same tether listener.
+The wired preview is authenticated, but it still uses plaintext HTTP over the USB network. After pairing, the desktop app can explicitly copy the authenticated OBS URL; desktop preview and OBS can run at the same time.
 
 ### Alternative: forward the stream over USB with ADB
 
@@ -44,7 +44,9 @@ The URL includes a fresh per-run bearer token that protects access to the page a
 
 ### Portable Windows companion (preview)
 
-Download the [Windows x64 portable preview](https://github.com/menagreen/GreenCam/releases/download/v0.1.0-alpha.9/GreenCam-Desktop-v0.1.0-alpha.9-win-x64.exe) or build it below. It is a single self-contained executable; the receiving PC does not need a separate .NET installation. On the phone, start the camera, enable the Wi-Fi stream, and tap **Pair with PC**. In the desktop app, enter the phone IP and six-digit code, tap **Pair**, then approve the request on the phone. The app previews MJPEG without showing or saving the bearer URL. **Disconnect** stops the preview. Use only trusted Wi-Fi because pairing and video are not encrypted.
+Download the [Windows x64 portable preview](https://github.com/menagreen/GreenCam/releases/download/v0.1.0-alpha.9/GreenCam-Desktop-v0.1.0-alpha.9-win-x64.exe) or build it below. It is a single self-contained executable; the receiving PC does not need a separate .NET installation. On the phone, start the camera, enable the Wi-Fi or USB-tether stream, and tap the corresponding **Pair with PC** action. In the desktop app, enter the phone IP and six-digit code, tap **Pair**, then approve the request on the phone. The app previews MJPEG without showing or saving the bearer URL. **Disconnect** stops the preview. Use only a trusted connection because pairing and video are not encrypted.
+
+After pairing, **Copy OBS URL** explicitly copies the authenticated page URL for an OBS Browser Source. OBS and the desktop preview can stream simultaneously (two stream clients per listener); a third stream receives HTTP 503. The URL contains a bearer secret that remains on the Windows clipboard until replaced, even after desktop disconnect. Do not share it. Stopping the phone camera or its transport invalidates the token.
 
 To build the portable executable on a development PC with .NET 10 SDK:
 
