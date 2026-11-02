@@ -10,24 +10,26 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
 import java.nio.charset.StandardCharsets;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 
 final class MjpegHttpServer implements AutoCloseable {
     static final int PORT = 8765;
     private static final int MAX_REQUEST_LINE_BYTES = 1024;
     private static final int MAX_HEADER_BYTES = 4096;
+    private static final int MAX_STREAM_CLIENTS = 2;
 
     private final LatestJpegFrameStore frames;
     private final int port;
     private final MjpegRequestAuthenticator authenticator;
     private final InetAddress bindAddress;
     private final AtomicBoolean running = new AtomicBoolean();
-    private final AtomicReference<Socket> activeStream = new AtomicReference<>();
-    private final ExecutorService streamExecutor = Executors.newSingleThreadExecutor(runnable -> {
+    private final Set<Socket> activeStreams = new HashSet<>();
+    private final ExecutorService streamExecutor = Executors.newFixedThreadPool(MAX_STREAM_CLIENTS, runnable -> {
         Thread thread = new Thread(runnable, "webcam-mjpeg-stream");
         thread.setDaemon(true);
         return thread;
@@ -120,7 +122,7 @@ final class MjpegHttpServer implements AutoCloseable {
                         : MjpegHttpProtocol.indexResponse(authenticator.tokenForSession()));
                 output.flush();
             } else if (route == MjpegHttpProtocol.Route.STREAM) {
-                if (!activeStream.compareAndSet(null, client)) {
+                if (!reserveStream(client)) {
                     output.write(MjpegHttpProtocol.busyResponse());
                     output.flush();
                 } else {
@@ -128,7 +130,7 @@ final class MjpegHttpServer implements AutoCloseable {
                         streamExecutor.execute(() -> streamFrames(client));
                         ownedByStream = true;
                     } catch (RejectedExecutionException exception) {
-                        activeStream.compareAndSet(client, null);
+                        releaseStream(client);
                         output.write(MjpegHttpProtocol.busyResponse());
                         output.flush();
                     }
@@ -141,6 +143,19 @@ final class MjpegHttpServer implements AutoCloseable {
             if (!ownedByStream) {
                 closeQuietly(client);
             }
+        }
+    }
+
+    private boolean reserveStream(Socket client) {
+        synchronized (activeStreams) {
+            return running.get() && activeStreams.size() < MAX_STREAM_CLIENTS
+                    && activeStreams.add(client);
+        }
+    }
+
+    private void releaseStream(Socket client) {
+        synchronized (activeStreams) {
+            activeStreams.remove(client);
         }
     }
 
@@ -228,7 +243,7 @@ final class MjpegHttpServer implements AutoCloseable {
         } catch (IOException ignored) {
             // Client disconnects and camera stop both close the stream socket.
         } finally {
-            activeStream.compareAndSet(client, null);
+            releaseStream(client);
             closeQuietly(client);
         }
     }
@@ -237,7 +252,10 @@ final class MjpegHttpServer implements AutoCloseable {
     public synchronized void close() {
         running.set(false);
         closeQuietly(serverSocket);
-        closeQuietly(activeStream.getAndSet(null));
+        synchronized (activeStreams) {
+            for (Socket client : activeStreams) closeQuietly(client);
+            activeStreams.clear();
+        }
         streamExecutor.shutdownNow();
         serverSocket = null;
         acceptThread = null;

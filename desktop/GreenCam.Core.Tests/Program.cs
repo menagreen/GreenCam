@@ -43,6 +43,8 @@ Equal(8765, session.Port);
 using var lanHandler = PairingClient.CreateLanHandler();
 Equal(false, lanHandler.UseProxy);
 Equal(false, lanHandler.AllowAutoRedirect);
+Equal("http://192.168.1.42:8765/?token=0123456789abcdef0123456789abcdef",
+    ObsUrlPolicy.Create(session));
 Console.WriteLine("All desktop core tests passed.");
 
 sealed class StubHandler : HttpMessageHandler
