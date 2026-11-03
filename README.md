@@ -71,6 +71,7 @@ See the [OBS Browser Source guide](https://obsproject.com/kb/browser-source) for
 
 ## Controls and privacy
 
+- On Android, use **Camera** for preview, camera/FPS/zoom and Start/Stop; **Connection** for Wi-Fi or USB tether streaming and pairing; and **Settings** for theme, dim screen, and help. Switching sections does not restart the camera; incoming pairing approvals bring Connection to the foreground.
 - **Start camera / Stop camera** controls preview and streaming together.
 - **Enable Wi-Fi OBS stream** is an optional second listener for a trusted local Wi-Fi network; its URL is hidden when disabled, unavailable, or when the camera stops. The URL contains a bearer token, but HTTP is not encrypted and does not provide confidentiality.
 - **Pair with PC** (while the Wi-Fi stream runs) shows a six-digit, two-minute invitation and the phone's local IP/port. A connecting PC must submit the code to `POST /pair?code=<six digits>` on port 8766, then wait for explicit approval on the phone. Five incorrect codes close the invitation; approval returns the current MJPEG token once in a `no-store` JSON response. Stop the camera or Wi-Fi to revoke the invitation. This is intended for a trusted LAN only: pairing and MJPEG use plaintext HTTP, so network observers may intercept credentials. The portable desktop preview supports pairing and video; remote camera controls and filters remain future work.

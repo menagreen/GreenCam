@@ -1,6 +1,10 @@
 <resources>
     <string name="app_name">GreenCam</string>
     <string name="about_title">About</string>
+    <string name="section_camera">Camera</string>
+    <string name="section_connection">Connection</string>
+    <string name="section_settings">Settings</string>
+    <string name="connection_hint">Start the camera in the Camera tab, then enable Wi-Fi or USB tether streaming here.</string>
     <string name="about_message">GreenCam was created by menagreen for content creators who cannot afford a webcam or want to make the most of their phone camera.</string>
     <string name="subtitle">Your USB camera for OBS</string>
     <string name="camera">Camera</string>
@@ -18,7 +22,7 @@
     <string name="wifi_warning">Wi-Fi streaming is for a trusted local network only. The URL contains a bearer token; HTTP is not encrypted and the token is not confidentiality protection.</string>
     <string name="copy_obs_url">Copy OBS URL</string>
     <string name="copy_obs_description">Copy protected Wi-Fi OBS URL to clipboard</string>
-    <string name="help">Keep GreenCam open. On your computer, forward ADB port 8765 and add http://localhost:8765/ as an OBS Browser Source.</string>
+    <string name="help">Keep GreenCam open. For Wi-Fi or USB tethering, start the camera, enable the matching stream, and pair with the desktop app. ADB is optional: use it only for the legacy localhost:8765 OBS route.</string>
     <string name="black_screen_description">Black screen. Tap anywhere to restore the camera controls.</string>
     <string name="tap_to_restore">Tap to restore</string>
     <string name="restore_description">Restore screen brightness and show camera controls</string>
