@@ -96,6 +96,12 @@ public final class MainActivity extends AppCompatActivity {
     private TextView wiredPairingStatusView;
     private Button wiredApproveButton;
     private Button wiredRejectButton;
+    private LinearLayout cameraSection;
+    private LinearLayout connectionSection;
+    private LinearLayout settingsSection;
+    private ScrollView sectionScrollView;
+    private final Button[] sectionButtons = new Button[3];
+    private int selectedSection = UiSectionPolicy.CAMERA;
     private FrameLayout dimOverlay;
     private RadioGroup cameraGroup;
     private RadioGroup fpsGroup;
@@ -190,6 +196,7 @@ public final class MainActivity extends AppCompatActivity {
 
     private void createLayout() {
         ScrollView scrollView = new ScrollView(this);
+        sectionScrollView = scrollView;
         scrollView.setFillViewport(true);
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -220,6 +227,33 @@ public final class MainActivity extends AppCompatActivity {
         subtitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         root.addView(subtitle);
 
+        LinearLayout navigation = new LinearLayout(this);
+        navigation.setOrientation(LinearLayout.HORIZONTAL);
+        int[] sectionLabels = {R.string.section_camera, R.string.section_connection,
+                R.string.section_settings};
+        for (int section = UiSectionPolicy.CAMERA; section <= UiSectionPolicy.SETTINGS; section++) {
+            final int target = section;
+            Button button = new Button(this);
+            button.setText(sectionLabels[section]);
+            button.setAllCaps(false);
+            button.setMinHeight(dp(48));
+            button.setOnClickListener(view -> showSection(target));
+            sectionButtons[section] = button;
+            navigation.addView(button, new LinearLayout.LayoutParams(0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+        }
+        root.addView(navigation);
+        cameraSection = sectionContainer();
+        connectionSection = sectionContainer();
+        settingsSection = sectionContainer();
+        root.addView(cameraSection);
+        root.addView(connectionSection);
+        root.addView(settingsSection);
+        TextView connectionHint = new TextView(this);
+        connectionHint.setText(R.string.connection_hint);
+        connectionHint.setPadding(0, dp(8), 0, dp(8));
+        connectionSection.addView(connectionHint);
+
         themeButton = new Button(this);
         themeButton.setOnClickListener(view -> {
             if (started) {
@@ -231,14 +265,14 @@ public final class MainActivity extends AppCompatActivity {
                     ? AppCompatDelegate.MODE_NIGHT_YES : themeMode == ThemeModePolicy.LIGHT
                     ? AppCompatDelegate.MODE_NIGHT_NO : AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
         });
-        root.addView(themeButton);
+        settingsSection.addView(themeButton);
 
         previewView = new PreviewView(this);
         previewView.setImplementationMode(PreviewView.ImplementationMode.COMPATIBLE);
         previewView.setBackgroundColor(Color.BLACK);
         int previewHeight = Math.min(dp(320), Math.max(dp(180),
                 (getResources().getDisplayMetrics().widthPixels - dp(32)) * 9 / 16));
-        root.addView(previewView, new LinearLayout.LayoutParams(
+        cameraSection.addView(previewView, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, previewHeight));
         previewView.setOnTouchListener((view, event) -> {
             if (event.getAction() != MotionEvent.ACTION_UP || !started || boundCamera == null) {
@@ -255,7 +289,7 @@ public final class MainActivity extends AppCompatActivity {
         zoomValueView = new TextView(this);
         zoomValueView.setText(R.string.zoom_unavailable);
         zoomValueView.setPadding(0, dp(12), 0, 0);
-        root.addView(zoomValueView);
+        cameraSection.addView(zoomValueView);
         zoomSeekBar = new SeekBar(this);
         zoomSeekBar.setMax(100);
         zoomSeekBar.setEnabled(false);
@@ -273,27 +307,27 @@ public final class MainActivity extends AppCompatActivity {
             @Override public void onStartTrackingTouch(SeekBar seekBar) { }
             @Override public void onStopTrackingTouch(SeekBar seekBar) { }
         });
-        root.addView(zoomSeekBar);
+        cameraSection.addView(zoomSeekBar);
 
         statusView = new TextView(this);
         statusView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
         statusView.setPadding(0, dp(12), 0, dp(4));
-        root.addView(statusView, new LinearLayout.LayoutParams(
+        cameraSection.addView(statusView, 0, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
         selectionView = new TextView(this);
         selectionView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
-        root.addView(selectionView);
+        cameraSection.addView(selectionView);
 
         cameraCapabilityView = new TextView(this);
         cameraCapabilityView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
-        root.addView(cameraCapabilityView);
+        cameraSection.addView(cameraCapabilityView);
 
         TextView cameraLabel = new TextView(this);
         cameraLabel.setText(R.string.camera);
         cameraLabel.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
         cameraLabel.setPadding(0, dp(16), 0, 0);
-        root.addView(cameraLabel);
+        cameraSection.addView(cameraLabel);
 
         cameraGroup = new RadioGroup(this);
         cameraGroup.setOrientation(RadioGroup.HORIZONTAL);
@@ -321,13 +355,13 @@ public final class MainActivity extends AppCompatActivity {
                 }
             }
         });
-        root.addView(cameraGroup);
+        cameraSection.addView(cameraGroup);
 
         TextView fpsLabel = new TextView(this);
         fpsLabel.setText(R.string.output_rate);
         fpsLabel.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
         fpsLabel.setPadding(0, dp(12), 0, 0);
-        root.addView(fpsLabel);
+        cameraSection.addView(fpsLabel);
 
         fpsGroup = new RadioGroup(this);
         fpsGroup.setOrientation(RadioGroup.HORIZONTAL);
@@ -346,14 +380,14 @@ public final class MainActivity extends AppCompatActivity {
             frameRateLimiter.setMaxFps(fps);
             updateControls();
         });
-        root.addView(fpsGroup);
+        cameraSection.addView(fpsGroup);
 
         startButton = new Button(this);
         startButton.setOnClickListener(view -> onStartClicked());
         LinearLayout.LayoutParams startParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         startParams.topMargin = dp(12);
-        root.addView(startButton, startParams);
+        cameraSection.addView(startButton, 0, startParams);
 
         dimScreenButton = new Button(this);
         dimScreenButton.setText(R.string.dim_screen);
@@ -362,7 +396,7 @@ public final class MainActivity extends AppCompatActivity {
         LinearLayout.LayoutParams dimParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         dimParams.topMargin = dp(8);
-        root.addView(dimScreenButton, dimParams);
+        settingsSection.addView(dimScreenButton, dimParams);
 
         wifiButton = new Button(this);
         wifiButton.setText(R.string.enable_wifi);
@@ -371,31 +405,31 @@ public final class MainActivity extends AppCompatActivity {
         LinearLayout.LayoutParams wifiParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         wifiParams.topMargin = dp(8);
-        root.addView(wifiButton, wifiParams);
+        connectionSection.addView(wifiButton, wifiParams);
         wifiWarningView = new TextView(this);
         wifiWarningView.setText(R.string.wifi_warning);
         wifiWarningView.setVisibility(View.GONE);
         wifiWarningView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
-        root.addView(wifiWarningView);
+        connectionSection.addView(wifiWarningView);
         wifiUrlView = new TextView(this);
         wifiUrlView.setVisibility(View.GONE);
         wifiUrlView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
-        root.addView(wifiUrlView);
+        connectionSection.addView(wifiUrlView);
         wifiCopyButton = new Button(this);
         wifiCopyButton.setText(R.string.copy_obs_url);
         wifiCopyButton.setContentDescription(getString(R.string.copy_obs_description));
         wifiCopyButton.setVisibility(View.GONE);
         wifiCopyButton.setOnClickListener(view -> copyWifiObsUrl());
-        root.addView(wifiCopyButton);
+        connectionSection.addView(wifiCopyButton);
 
         pairingButton = new Button(this);
         pairingButton.setText(R.string.pair_with_pc);
         pairingButton.setVisibility(View.GONE);
         pairingButton.setOnClickListener(view -> beginPairing());
-        root.addView(pairingButton);
+        connectionSection.addView(pairingButton);
         pairingStatusView = new TextView(this);
         pairingStatusView.setVisibility(View.GONE);
-        root.addView(pairingStatusView);
+        connectionSection.addView(pairingStatusView);
         pairingApproveButton = new Button(this);
         pairingApproveButton.setText(R.string.approve_pc);
         pairingApproveButton.setVisibility(View.GONE);
@@ -406,7 +440,7 @@ public final class MainActivity extends AppCompatActivity {
             pairingApproveButton.setVisibility(View.GONE);
             pairingRejectButton.setVisibility(View.GONE);
         });
-        root.addView(pairingApproveButton);
+        connectionSection.addView(pairingApproveButton);
         pairingRejectButton = new Button(this);
         pairingRejectButton.setText(R.string.reject_pc);
         pairingRejectButton.setVisibility(View.GONE);
@@ -414,24 +448,24 @@ public final class MainActivity extends AppCompatActivity {
             if (pairingGate != null) pairingGate.revoke();
             clearPairingUi();
         });
-        root.addView(pairingRejectButton);
+        connectionSection.addView(pairingRejectButton);
 
         wiredButton = new Button(this);
         wiredButton.setText(R.string.enable_usb_tether);
         wiredButton.setEnabled(false);
         wiredButton.setOnClickListener(view -> setWiredEnabled(!wiredEnabled));
-        root.addView(wiredButton);
+        connectionSection.addView(wiredButton);
         wiredInfoView = new TextView(this);
         wiredInfoView.setVisibility(View.GONE);
-        root.addView(wiredInfoView);
+        connectionSection.addView(wiredInfoView);
         wiredPairingButton = new Button(this);
         wiredPairingButton.setText(R.string.usb_pair_with_pc);
         wiredPairingButton.setVisibility(View.GONE);
         wiredPairingButton.setOnClickListener(view -> beginWiredPairing());
-        root.addView(wiredPairingButton);
+        connectionSection.addView(wiredPairingButton);
         wiredPairingStatusView = new TextView(this);
         wiredPairingStatusView.setVisibility(View.GONE);
-        root.addView(wiredPairingStatusView);
+        connectionSection.addView(wiredPairingStatusView);
         wiredApproveButton = new Button(this);
         wiredApproveButton.setText(R.string.approve_pc);
         wiredApproveButton.setVisibility(View.GONE);
@@ -442,7 +476,7 @@ public final class MainActivity extends AppCompatActivity {
             wiredApproveButton.setVisibility(View.GONE);
             wiredRejectButton.setVisibility(View.GONE);
         });
-        root.addView(wiredApproveButton);
+        connectionSection.addView(wiredApproveButton);
         wiredRejectButton = new Button(this);
         wiredRejectButton.setText(R.string.reject_pc);
         wiredRejectButton.setVisibility(View.GONE);
@@ -450,12 +484,13 @@ public final class MainActivity extends AppCompatActivity {
             if (wiredPairingGate != null) wiredPairingGate.revoke();
             clearWiredPairingUi();
         });
-        root.addView(wiredRejectButton);
+        connectionSection.addView(wiredRejectButton);
 
         TextView help = new TextView(this);
         help.setText(R.string.help);
         help.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
-        root.addView(help);
+        settingsSection.addView(help);
+        showSection(UiSectionPolicy.CAMERA);
         FrameLayout content = new FrameLayout(this);
         content.addView(scrollView, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
@@ -477,6 +512,24 @@ public final class MainActivity extends AppCompatActivity {
         content.addView(dimOverlay, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         setContentView(content);
+    }
+
+    private LinearLayout sectionContainer() {
+        LinearLayout section = new LinearLayout(this);
+        section.setOrientation(LinearLayout.VERTICAL);
+        return section;
+    }
+
+    private void showSection(int requestedSection) {
+        selectedSection = UiSectionPolicy.sanitize(requestedSection);
+        LinearLayout[] sections = {cameraSection, connectionSection, settingsSection};
+        for (int section = UiSectionPolicy.CAMERA; section <= UiSectionPolicy.SETTINGS; section++) {
+            boolean visible = UiSectionPolicy.isVisible(selectedSection, section);
+            sections[section].setVisibility(visible ? View.VISIBLE : View.GONE);
+            sectionButtons[section].setSelected(visible);
+            sectionButtons[section].setAlpha(visible ? 1f : 0.65f);
+        }
+        sectionScrollView.post(() -> sectionScrollView.scrollTo(0, 0));
     }
 
     private RadioButton cameraOption(String label, RadioGroup group) {
@@ -924,6 +977,7 @@ public final class MainActivity extends AppCompatActivity {
 
     private void showPendingPairing() {
         if (pairingGate == null || pairingGate.pendingClient() == null) return;
+        showSection(UiSectionPolicy.CONNECTION);
         pairingStatusView.setText(getString(R.string.pairing_request,
                 pairingGate.pendingClient()));
         pairingStatusView.setVisibility(View.VISIBLE);
@@ -1055,6 +1109,7 @@ public final class MainActivity extends AppCompatActivity {
 
     private void showPendingWiredPairing(PairingGate gate) {
         if (gate != wiredPairingGate || gate.pendingClient() == null) return;
+        showSection(UiSectionPolicy.CONNECTION);
         wiredPairingStatusView.setText(getString(R.string.pairing_request,
                 gate.pendingClient()));
         wiredPairingStatusView.setVisibility(View.VISIBLE);
